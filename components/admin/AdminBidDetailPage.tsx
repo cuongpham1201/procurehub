@@ -1,0 +1,472 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getBidById, updateBidStatus, deleteBid } from "@/services/supplierBidStorage";
+import { getAccounts } from "@/services/supplierAccountStorage";
+import { getInternalSession } from "@/services/authStorage";
+import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
+import type { SupplierBid, BidItem, BidStatus } from "@/types/supplierBid";
+import type { SupplierAccount } from "@/types/supplierAccount";
+
+// ── Status config ─────────────────────────────────────────────────────────────
+
+const BID_STATUS_COLORS: Record<string, string> = {
+  "Đã nộp":           "bg-blue-100 text-blue-700 border-blue-200",
+  "Chờ xem xét":      "bg-amber-100 text-amber-700 border-amber-200",
+  "Đang đánh giá":    "bg-indigo-100 text-indigo-700 border-indigo-200",
+  "Cần bổ sung":      "bg-orange-100 text-orange-700 border-orange-200",
+  "Được chọn":        "bg-emerald-100 text-emerald-700 border-emerald-200",
+  "Không được chọn":  "bg-slate-100 text-slate-500 border-slate-200",
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatVnd(value: number): string {
+  if (!value || isNaN(value)) return "—";
+  if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(2) + " tỷ ₫";
+  if (value >= 1_000_000) return (value / 1_000_000).toFixed(1) + " triệu ₫";
+  return value.toLocaleString("vi-VN") + " ₫";
+}
+
+function formatDate(iso: string): string {
+  try { return new Date(iso).toLocaleString("vi-VN"); } catch { return iso; }
+}
+
+function bidTotal(bid: SupplierBid): number {
+  return bid.totalAmount ?? bid.totalPrice ?? 0;
+}
+
+function bidDate(bid: SupplierBid): string {
+  return bid.submittedAt ?? bid.createdAt ?? "";
+}
+
+function bidTitle(bid: SupplierBid): string {
+  return bid.tenderTitle ?? bid.tenderName ?? "—";
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+function IconArrowLeft() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m12 19-7-7 7-7M19 12H5" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function IconFile() {
+  return (
+    <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7l-5-5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 2v4a2 2 0 002 2h4" />
+    </svg>
+  );
+}
+
+// ── Section / InfoRow ─────────────────────────────────────────────────────────
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:gap-4 py-2.5 border-b border-slate-50 last:border-0">
+      <div className="sm:w-44 text-xs font-medium text-slate-400 flex-shrink-0 mb-0.5 sm:mb-0 sm:pt-0.5">
+        {label}
+      </div>
+      <div className="text-sm text-slate-700 flex-1">{value ?? "—"}</div>
+    </div>
+  );
+}
+
+// ── Items table ───────────────────────────────────────────────────────────────
+
+function BidItemsTable({ items }: { items: BidItem[] | undefined }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="py-4 text-center text-sm text-slate-400 italic">
+        Dữ liệu báo giá cũ chưa có chi tiết mặt hàng.
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm" style={{ minWidth: 700 }}>
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50/60">
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 pr-3 w-8">STT</th>
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 pr-3 min-w-[120px]">Tên hàng</th>
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 pr-3 w-[120px]">Quy cách</th>
+            <th className="text-right text-xs font-medium text-slate-400 py-2.5 pr-3 w-14">SL</th>
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 pr-3 w-14">ĐVT</th>
+            <th className="text-right text-xs font-medium text-slate-400 py-2.5 pr-3 w-[120px]">Đơn giá</th>
+            <th className="text-right text-xs font-medium text-slate-400 py-2.5 pr-3 w-[120px]">Thành tiền</th>
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 pr-3 w-[100px]">Thương hiệu</th>
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 pr-3 w-[80px]">Xuất xứ</th>
+            <th className="text-left text-xs font-medium text-slate-400 py-2.5 w-[100px]">Ghi chú</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, i) => (
+            <tr key={item.id} className="border-b border-slate-50 last:border-0">
+              <td className="py-3 pr-3 text-xs text-slate-400">{i + 1}</td>
+              <td className="py-3 pr-3 font-medium text-slate-800">{item.itemName}</td>
+              <td className="py-3 pr-3 text-slate-500 text-xs leading-relaxed">{item.specification || "—"}</td>
+              <td className="py-3 pr-3 text-right font-semibold text-slate-700 whitespace-nowrap text-xs">
+                {item.quantity.toLocaleString("vi-VN")}
+              </td>
+              <td className="py-3 pr-3 text-slate-500 text-xs whitespace-nowrap">{item.unit}</td>
+              <td className="py-3 pr-3 text-right text-slate-700 text-xs whitespace-nowrap">
+                {item.unitPrice > 0 ? item.unitPrice.toLocaleString("vi-VN") + " ₫" : "—"}
+              </td>
+              <td className="py-3 pr-3 text-right font-semibold text-[#0f2d5e] text-xs whitespace-nowrap">
+                {item.amount > 0 ? formatVnd(item.amount) : "—"}
+              </td>
+              <td className="py-3 pr-3 text-slate-500 text-xs">{item.brand || "—"}</td>
+              <td className="py-3 pr-3 text-slate-500 text-xs">{item.origin || "—"}</td>
+              <td className="py-3 text-slate-400 text-xs">{item.note || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-slate-200 bg-slate-50/60">
+            <td colSpan={6} className="py-3 pr-3 text-right text-xs font-semibold text-slate-600">Tổng giá trị</td>
+            <td className="py-3 pr-3 text-right font-bold text-[#0f2d5e]">
+              {formatVnd(items.reduce((s, it) => s + (it.amount ?? 0), 0))}
+            </td>
+            <td colSpan={3} />
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ── Action buttons ────────────────────────────────────────────────────────────
+
+interface ActionBtn { label: string; status: BidStatus; style: string; }
+
+function getActions(current: BidStatus): ActionBtn[] {
+  switch (current) {
+    case "Đã nộp":
+      return [{ label: "Bắt đầu xem xét", status: "Chờ xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
+    case "Chờ xem xét":
+      return [
+        { label: "Chuyển sang đánh giá", status: "Đang đánh giá", style: "bg-indigo-600 hover:bg-indigo-700 text-white" },
+        { label: "Yêu cầu bổ sung", status: "Cần bổ sung", style: "bg-orange-500 hover:bg-orange-600 text-white" },
+        { label: "Không chọn", status: "Không được chọn", style: "bg-slate-500 hover:bg-slate-600 text-white" },
+      ];
+    case "Đang đánh giá":
+      return [
+        { label: "Yêu cầu bổ sung", status: "Cần bổ sung", style: "bg-orange-500 hover:bg-orange-600 text-white" },
+        { label: "Không chọn", status: "Không được chọn", style: "bg-slate-500 hover:bg-slate-600 text-white" },
+      ];
+    case "Cần bổ sung":
+      return [{ label: "Tiếp tục xem xét", status: "Chờ xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
+    default:
+      return [];
+  }
+}
+
+// ── Not found ─────────────────────────────────────────────────────────────────
+
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-5 text-slate-300">
+        <IconFile />
+      </div>
+      <h2 className="text-lg font-bold text-slate-700 mb-2">Không tìm thấy báo giá</h2>
+      <p className="text-sm text-slate-400 mb-6">Báo giá này không tồn tại hoặc đã bị xóa.</p>
+      <Link
+        href="/admin/bids"
+        className="inline-flex items-center gap-2 text-sm font-medium text-[#0f2d5e] border border-[#0f2d5e]/20 px-4 py-2 rounded-lg hover:bg-[#0f2d5e] hover:text-white transition-colors"
+      >
+        <IconArrowLeft />
+        Quay lại danh sách
+      </Link>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
+  const router = useRouter();
+  const [bid, setBid] = useState<SupplierBid | null | undefined>(undefined);
+  const [supplierAccount, setSupplierAccount] = useState<SupplierAccount | null>(null);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const found = getBidById(bidId);
+    setBid(found ?? null);
+    if (found) {
+      const accounts = getAccounts();
+      setSupplierAccount(accounts.find((a) => a.id === found.supplierId) ?? null);
+    }
+    setLoading(false);
+  }, [bidId]);
+
+  function handleDelete() {
+    if (!bid) return;
+    deleteBid(bid.id);
+    router.push("/admin/bids");
+  }
+
+  function handleStatusUpdate(newStatus: BidStatus) {
+    if (!bid) return;
+    updateBidStatus(bid.id, newStatus);
+    setBid((prev) => (prev ? { ...prev, status: newStatus } : prev));
+    setSuccessMsg("Đã cập nhật trạng thái báo giá.");
+    setTimeout(() => setSuccessMsg(""), 4000);
+    addAdminActivityLog({
+      type: "bid_status",
+      title: "Cập nhật trạng thái báo giá",
+      description: `${bid.bidCode ?? bid.id} của ${bid.supplierName} chuyển sang ${newStatus}`,
+      entityType: "bid",
+      entityId: bid.id,
+      entityCode: bid.bidCode ?? bid.id,
+      ...actorFromSession(getInternalSession()),
+    });
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-24"><p className="text-slate-400 text-sm">Đang tải...</p></div>;
+  }
+  if (!bid) return <NotFound />;
+
+  const statusCls = BID_STATUS_COLORS[bid.status] ?? "bg-slate-100 text-slate-500 border-slate-200";
+  const actions = getActions(bid.status);
+  const total = bidTotal(bid);
+  const date = bidDate(bid);
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+            <Link href="/admin/bids" className="hover:text-slate-600 transition-colors">Báo giá</Link>
+            <span>›</span>
+            <span className="text-slate-600 font-mono">{bid.bidCode ?? bid.id}</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-800">Chi tiết báo giá</h1>
+          <p className="text-sm text-slate-500 mt-1">{bidTitle(bid)}</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className={`text-sm font-semibold px-3 py-1.5 rounded-full border ${statusCls}`}>
+            {bid.status}
+          </span>
+        </div>
+      </div>
+
+      {successMsg && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 mb-5 text-sm">
+          <IconCheck />
+          {successMsg}
+        </div>
+      )}
+
+      <div className="grid lg:grid-cols-3 gap-5">
+
+        <div className="lg:col-span-2 flex flex-col gap-5">
+
+          {/* Thông tin gói thầu */}
+          <Section title="Thông tin gói thầu">
+            <InfoRow label="Mã gói thầu" value={<span className="font-mono font-semibold text-[#0f2d5e]">{bid.tenderCode}</span>} />
+            <InfoRow label="Tên gói thầu" value={bidTitle(bid)} />
+          </Section>
+
+          {/* Nhà cung cấp */}
+          <Section title="Nhà cung cấp">
+            <InfoRow label="Tên công ty" value={<span className="font-semibold">{bid.supplierName || supplierAccount?.companyName || "—"}</span>} />
+            <InfoRow label="Mã nhà cung cấp" value={<span className="font-mono">{bid.supplierId}</span>} />
+            {supplierAccount && (
+              <>
+                <InfoRow label="Email" value={supplierAccount.email} />
+                <InfoRow label="Người liên hệ" value={supplierAccount.contactName} />
+                <InfoRow label="Điện thoại" value={supplierAccount.phone} />
+                <InfoRow
+                  label="Trạng thái NCC"
+                  value={
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      supplierAccount.status === "Đã duyệt" ? "bg-green-100 text-green-700"
+                      : supplierAccount.status === "Từ chối" ? "bg-red-100 text-red-600"
+                      : "bg-amber-100 text-amber-700"
+                    }`}>
+                      {supplierAccount.status}
+                    </span>
+                  }
+                />
+              </>
+            )}
+          </Section>
+
+          {/* Điều kiện thương mại */}
+          <Section title="Điều kiện thương mại">
+            <InfoRow
+              label="Tổng giá trị báo giá"
+              value={<span className="font-bold text-lg text-[#0f2d5e]">{formatVnd(total)}</span>}
+            />
+            <InfoRow label="Thời gian giao hàng" value={bid.deliveryTime} />
+            <InfoRow label="Điều kiện thanh toán" value={bid.paymentTerms} />
+            <InfoRow label="Bảo hành" value={bid.warrantyPolicy} />
+            {bid.note && (
+              <InfoRow label="Ghi chú" value={<p className="whitespace-pre-wrap leading-relaxed">{bid.note}</p>} />
+            )}
+            {/* backward compat: show technical note from old model */}
+            {bid.technicalNote && !bid.note && (
+              <InfoRow label="Ghi chú kỹ thuật" value={<p className="whitespace-pre-wrap leading-relaxed">{bid.technicalNote}</p>} />
+            )}
+          </Section>
+
+          {/* Chi tiết mặt hàng */}
+          <Section title={`Chi tiết mặt hàng${bid.items?.length ? ` (${bid.items.length} dòng)` : ""}`}>
+            <BidItemsTable items={bid.items} />
+          </Section>
+
+        </div>
+
+        <div className="flex flex-col gap-5">
+
+          {/* Timeline */}
+          <Section title="Timeline">
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">1</div>
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Đã nộp báo giá</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{date ? formatDate(date) : "—"}</p>
+                </div>
+              </div>
+              {bid.status !== "Đã nộp" && (
+                <div className="flex gap-3">
+                  <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${BID_STATUS_COLORS[bid.status] ?? "bg-slate-100"}`}>
+                    <IconCheck />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Trạng thái hiện tại</p>
+                    <p className="text-xs font-medium mt-0.5 text-slate-600">{bid.status}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          {/* Actions */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Thao tác</h3>
+            {actions.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {actions.map((action) => (
+                  <button
+                    key={action.status}
+                    onClick={() => handleStatusUpdate(action.status)}
+                    className={`w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors ${action.style}`}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">Không có thao tác nào khả dụng.</p>
+            )}
+            {bid.status === "Đang đánh giá" && (
+              <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                <p className="text-xs text-indigo-700 font-medium mb-1">Chọn NCC trúng thầu</p>
+                <p className="text-xs text-indigo-600 mb-2">Việc chốt nhà cung cấp được thực hiện tại trang So sánh báo giá.</p>
+                <Link
+                  href="/admin/bid-comparison"
+                  className="block text-center text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 py-1.5 rounded-lg transition-colors"
+                >
+                  Đến So sánh báo giá →
+                </Link>
+              </div>
+            )}
+            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
+              <Link
+                href="/admin/bids"
+                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-slate-600 border border-slate-200 py-2.5 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <IconArrowLeft />
+                Quay lại danh sách
+              </Link>
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full flex items-center justify-center gap-2 text-sm font-medium text-red-500 border border-red-200 py-2.5 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  Xóa báo giá
+                </button>
+              ) : (
+                <div className="border border-red-200 bg-red-50 rounded-lg p-3">
+                  <p className="text-xs text-red-700 font-semibold mb-1">Xác nhận xóa báo giá này?</p>
+                  <p className="text-xs text-red-600 mb-3">Thao tác này chỉ áp dụng cho dữ liệu test localStorage.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDelete}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+                    >
+                      Xóa
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold py-2 rounded-lg transition-colors"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bid summary card */}
+          <div className="bg-[#0f2d5e] text-white rounded-xl p-5">
+            <h3 className="text-[#c9a227] font-semibold text-sm mb-3">Tóm tắt báo giá</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-white/60">Mã báo giá</span>
+                <span className="font-mono text-xs">{bid.bidCode ?? bid.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/60">Nhà cung cấp</span>
+                <span className="font-medium text-right max-w-[120px] truncate">{bid.supplierName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/60">Số dòng hàng</span>
+                <span className="font-medium">{bid.items?.length ?? "—"}</span>
+              </div>
+              <div className="border-t border-white/10 pt-2 mt-2">
+                <div className="flex justify-between">
+                  <span className="text-white/60">Tổng giá trị</span>
+                  <span className="font-bold text-[#c9a227]">{formatVnd(total)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

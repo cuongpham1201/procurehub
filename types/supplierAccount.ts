@@ -1,0 +1,21 @@
+export interface SupplierAccount {
+  id: string;
+  companyName: string;
+  taxCode: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  password: string;
+  profileCompleted: boolean;
+  status: string;
+  createdAt: string;
+  // Profile fields — populated when supplier completes profile
+  address?: string;
+  province?: string;
+  website?: string;
+  businessDescription?: string;
+  categories?: string[];
+  hotline?: string;
+  rfqEmail?: string;
+  quotationContact?: string;
+}
