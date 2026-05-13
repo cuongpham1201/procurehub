@@ -106,13 +106,13 @@ function UserModal({ mode, editingUser, currentUserId, onClose, onSaved }: UserM
     setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
   }
 
-  function validate(): boolean {
+  async function validate(): Promise<boolean> {
     const errs: Record<string, string> = {};
     if (!form.fullName.trim()) errs.fullName = "Họ tên không được rỗng.";
     if (!form.email.trim()) errs.email = "Email không được rỗng.";
     else if (!isValidEmail(form.email.trim())) errs.email = "Email không đúng định dạng.";
     else {
-      const dup = getAdminUsers().find(
+      const dup = (await getAdminUsers()).find(
         (u) => u.email.trim().toLowerCase() === form.email.trim().toLowerCase() && u.id !== editingUser?.id
       );
       if (dup) errs.email = "Email đã được sử dụng bởi người dùng khác.";
@@ -127,13 +127,13 @@ function UserModal({ mode, editingUser, currentUserId, onClose, onSaved }: UserM
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!(await validate())) return;
     setSaving(true);
-    setTimeout(() => {
+    try {
       if (mode === "create") {
-        saveAdminUser({
+        await saveAdminUser({
           id: generateUserId(),
           fullName: form.fullName.trim(),
           email: form.email.trim().toLowerCase(),
@@ -144,7 +144,7 @@ function UserModal({ mode, editingUser, currentUserId, onClose, onSaved }: UserM
           createdAt: new Date().toISOString(),
         });
       } else if (editingUser) {
-        saveAdminUser({
+        await saveAdminUser({
           ...editingUser,
           fullName: form.fullName.trim(),
           email: isBuiltin ? editingUser.email : form.email.trim().toLowerCase(),
@@ -154,9 +154,10 @@ function UserModal({ mode, editingUser, currentUserId, onClose, onSaved }: UserM
           password: form.password ? form.password : editingUser.password,
         });
       }
-      setSaving(false);
       onSaved();
-    }, 300);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -256,12 +257,12 @@ function NccEditModal({ account, onClose, onSaved }: NccEditModalProps) {
     setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
   }
 
-  function validate(): boolean {
+  async function validate(): Promise<boolean> {
     const errs: Record<string, string> = {};
     if (!form.email.trim()) errs.email = "Email không được rỗng.";
     else if (!isValidEmail(form.email.trim())) errs.email = "Email không đúng định dạng.";
     else {
-      const dup = getAccounts().find(
+      const dup = (await getAccounts()).find(
         (a) => a.id !== account.id && a.email.trim().toLowerCase() === form.email.trim().toLowerCase()
       );
       if (dup) errs.email = "Email đã được đăng ký bởi nhà cung cấp khác.";
@@ -269,7 +270,7 @@ function NccEditModal({ account, onClose, onSaved }: NccEditModalProps) {
     if (!form.phone.trim()) errs.phone = "Số điện thoại không được rỗng.";
     else {
       const normPhone = normalizePhone(form.phone.trim());
-      const dup = getAccounts().find(
+      const dup = (await getAccounts()).find(
         (a) => a.id !== account.id && normalizePhone(a.phone.trim()) === normPhone
       );
       if (dup) errs.phone = "Số điện thoại đã đăng ký bởi nhà cung cấp khác.";
@@ -278,20 +279,21 @@ function NccEditModal({ account, onClose, onSaved }: NccEditModalProps) {
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!(await validate())) return;
     setSaving(true);
-    setTimeout(() => {
-      updateAccount({
+    try {
+      await updateAccount({
         ...account,
         contactName: form.contactName.trim(),
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
       });
-      setSaving(false);
       onSaved();
-    }, 300);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -349,8 +351,8 @@ const DEFAULT_PASSWORD = "123456";
 function NccResetModal({ account, onClose, onReset }: NccResetModalProps) {
   const [done, setDone] = useState(false);
 
-  function handleReset() {
-    updateAccount({ ...account, password: DEFAULT_PASSWORD });
+  async function handleReset() {
+    await updateAccount({ ...account, password: DEFAULT_PASSWORD });
     setDone(true);
   }
 
@@ -432,14 +434,14 @@ export default function AdminUsersPage() {
     setTimeout(() => setSuccessMsg(""), 4000);
   }
 
-  function loadInternalUsers() {
-    const local = getAdminUsers();
+  async function loadInternalUsers() {
+    const local = await getAdminUsers();
     const hasFallback = local.some((u) => u.email.trim().toLowerCase() === MOCK_ADMIN.email);
     setAllUsers(hasFallback ? local : [{ ...MOCK_ADMIN, password: "" }, ...local]);
   }
 
-  function loadSuppliers() {
-    setSuppliers(getAccounts());
+  async function loadSuppliers() {
+    setSuppliers(await getAccounts());
   }
 
   useEffect(() => {
@@ -465,17 +467,17 @@ export default function AdminUsersPage() {
   const intLocked  = allUsers.filter((u) => u.status === "Tạm khóa").length;
   const intAdmins  = allUsers.filter((u) => u.role === "Admin").length;
 
-  function handleIntToggleLock(u: InternalUser) {
+  async function handleIntToggleLock(u: InternalUser) {
     if (u.id === currentUserId) return;
     const updated = { ...u, status: u.status === "Hoạt động" ? "Tạm khóa" : "Hoạt động" };
-    saveAdminUser(updated);
-    loadInternalUsers();
+    await saveAdminUser(updated);
+    await loadInternalUsers();
     showSuccess(updated.status === "Tạm khóa" ? `Đã khóa tài khoản ${u.fullName}.` : `Đã mở khóa ${u.fullName}.`);
   }
 
-  function handleUserModalSaved() {
+  async function handleUserModalSaved() {
     setUserModal(null);
-    loadInternalUsers();
+    await loadInternalUsers();
     showSuccess(userModal?.mode === "create" ? "Đã tạo tài khoản nội bộ mới." : "Đã cập nhật thông tin người dùng.");
   }
 
@@ -499,22 +501,22 @@ export default function AdminUsersPage() {
   const nccLocked  = suppliers.filter((a) => a.status === "Tạm khóa").length;
   const nccPending = suppliers.filter((a) => a.status === "Chờ xét duyệt" || (!a.profileCompleted && !a.status)).length;
 
-  function handleNccToggleLock(a: SupplierAccount) {
+  async function handleNccToggleLock(a: SupplierAccount) {
     const updated = { ...a, status: a.status === "Tạm khóa" ? "Đã duyệt" : "Tạm khóa" };
-    updateAccount(updated);
-    loadSuppliers();
+    await updateAccount(updated);
+    await loadSuppliers();
     showSuccess(updated.status === "Tạm khóa" ? `Đã khóa tài khoản ${a.companyName}.` : `Đã mở khóa ${a.companyName}.`);
   }
 
-  function handleNccEditSaved() {
+  async function handleNccEditSaved() {
     setNccModal(null);
-    loadSuppliers();
+    await loadSuppliers();
     showSuccess("Đã cập nhật thông tin liên hệ nhà cung cấp.");
   }
 
-  function handleNccResetDone() {
+  async function handleNccResetDone() {
     setNccModal(null);
-    loadSuppliers();
+    await loadSuppliers();
     showSuccess("Đã reset mật khẩu nhà cung cấp.");
   }
 

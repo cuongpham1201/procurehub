@@ -218,28 +218,31 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const found = getBidById(bidId);
-    setBid(found ?? null);
-    if (found) {
-      const accounts = getAccounts();
-      setSupplierAccount(accounts.find((a) => a.id === found.supplierId) ?? null);
+    async function loadData() {
+      const found = await getBidById(bidId);
+      setBid(found ?? null);
+      if (found) {
+        const accounts = await getAccounts();
+        setSupplierAccount(accounts.find((a) => a.id === found.supplierId) ?? null);
+      }
+      setLoading(false);
     }
-    setLoading(false);
+    loadData();
   }, [bidId]);
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!bid) return;
-    deleteBid(bid.id);
+    await deleteBid(bid.id);
     router.push("/admin/bids");
   }
 
-  function handleStatusUpdate(newStatus: BidStatus) {
+  async function handleStatusUpdate(newStatus: BidStatus) {
     if (!bid) return;
-    updateBidStatus(bid.id, newStatus);
+    await updateBidStatus(bid.id, newStatus);
     setBid((prev) => (prev ? { ...prev, status: newStatus } : prev));
     setSuccessMsg("Đã cập nhật trạng thái báo giá.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    addAdminActivityLog({
+    await addAdminActivityLog({
       type: "bid_status",
       title: "Cập nhật trạng thái báo giá",
       description: `${bid.bidCode ?? bid.id} của ${bid.supplierName} chuyển sang ${newStatus}`,

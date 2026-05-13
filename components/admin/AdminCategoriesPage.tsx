@@ -111,9 +111,10 @@ export default function AdminCategoriesPage() {
 
   const isAdmin = role === "Admin";
 
-  function reloadData() {
-    setCategories(getPurchaseCategories());
-    setMaterials(getMaterialItems());
+  async function reloadData() {
+    const [nextCategories, nextMaterials] = await Promise.all([getPurchaseCategories(), getMaterialItems()]);
+    setCategories(nextCategories);
+    setMaterials(nextMaterials);
   }
 
   useEffect(() => {
@@ -199,7 +200,7 @@ export default function AdminCategoriesPage() {
     setFormError("");
   }
 
-  function submitCategoryForm() {
+  async function submitCategoryForm() {
     if (!isAdmin) return;
     const code = categoryForm.code.trim().toUpperCase();
     const name = categoryForm.name.trim();
@@ -219,7 +220,7 @@ export default function AdminCategoriesPage() {
     }
 
     if (categoryMode === "edit") {
-      updatePurchaseCategory(categoryEditingId, {
+      await updatePurchaseCategory(categoryEditingId, {
         code,
         name,
         description: categoryForm.description,
@@ -227,7 +228,7 @@ export default function AdminCategoriesPage() {
       });
       showSuccess("Đã cập nhật nhóm mua sắm.");
     } else {
-      createPurchaseCategory({
+      await createPurchaseCategory({
         code,
         name,
         description: categoryForm.description,
@@ -236,13 +237,13 @@ export default function AdminCategoriesPage() {
       showSuccess("Đã thêm nhóm mua sắm.");
     }
     closeCategoryForm();
-    reloadData();
+    await reloadData();
   }
 
-  function handleToggleCategory(category: PurchaseCategory) {
+  async function handleToggleCategory(category: PurchaseCategory) {
     if (!isAdmin) return;
-    togglePurchaseCategoryStatus(category.id);
-    reloadData();
+    await togglePurchaseCategoryStatus(category.id);
+    await reloadData();
     showSuccess(category.status === "Hoạt động" ? "Đã khóa nhóm mua sắm." : "Đã mở khóa nhóm mua sắm.");
   }
 
@@ -282,7 +283,7 @@ export default function AdminCategoriesPage() {
     setFormError("");
   }
 
-  function submitMaterialForm() {
+  async function submitMaterialForm() {
     if (!isAdmin) return;
     const category = categories.find((item) => item.id === materialForm.categoryId);
     const materialCode = materialForm.materialCode.trim().toUpperCase();
@@ -313,20 +314,20 @@ export default function AdminCategoriesPage() {
     };
 
     if (materialMode === "edit") {
-      updateMaterialItem(materialEditingId, payload);
+      await updateMaterialItem(materialEditingId, payload);
       showSuccess("Đã cập nhật mã vật tư.");
     } else {
-      createMaterialItem(payload);
+      await createMaterialItem(payload);
       showSuccess("Đã thêm mã vật tư.");
     }
     closeMaterialForm();
-    reloadData();
+    await reloadData();
   }
 
-  function handleToggleMaterial(item: MaterialItem) {
+  async function handleToggleMaterial(item: MaterialItem) {
     if (!isAdmin) return;
-    toggleMaterialItemStatus(item.id);
-    reloadData();
+    await toggleMaterialItemStatus(item.id);
+    await reloadData();
     showSuccess(item.status === "Hoạt động" ? "Đã khóa mã vật tư." : "Đã mở khóa mã vật tư.");
   }
 
@@ -735,4 +736,3 @@ export default function AdminCategoriesPage() {
     </div>
   );
 }
-

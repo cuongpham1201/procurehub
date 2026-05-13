@@ -711,10 +711,13 @@ export default function LandingPage() {
   useEffect(() => {
     ensureCategorySeedData();
     ensureTenderSeedData();
-    const tenders = getTenders();
-    const activeCategories = getPurchaseCategories().filter((category) => category.status === "Hoạt động");
-    setCategoryStats(buildCategories(tenders, activeCategories));
-    setLatestTenders(buildLatestOpenTenders(tenders));
+    async function loadData() {
+      const [tenders, categories] = await Promise.all([getTenders(), getPurchaseCategories()]);
+      const activeCategories = categories.filter((category) => category.status === "Hoạt động");
+      setCategoryStats(buildCategories(tenders, activeCategories));
+      setLatestTenders(buildLatestOpenTenders(tenders));
+    }
+    loadData();
   }, []);
 
   function handleSearch() {

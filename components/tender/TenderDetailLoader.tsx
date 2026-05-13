@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import TenderDetailPage from "./TenderDetailPage";
 import type { Tender } from "@/types/tender";
-import { ensureTenderSeedData, getAdminTenderById, adminToPublicTender } from "@/services/tenderStorage";
+import { getAdminTenderById, adminToPublicTender } from "@/services/tenderStorage";
 import { getInternalSession } from "@/services/authStorage";
 import { getCurrentSession } from "@/services/supplierAccountStorage";
 import { getBidsBySupplier } from "@/services/supplierBidStorage";
@@ -17,50 +17,52 @@ export default function TenderDetailLoader({ id }: { id: string }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    ensureTenderSeedData();
-    const adminTender = getAdminTenderById(id);
+    async function loadData() {
+      const adminTender = await getAdminTenderById(id);
 
-    if (!adminTender || adminTender.status === "Nháp") {
-      setTender(undefined);
-      setReady(true);
-      return;
-    }
+      if (!adminTender || adminTender.status === "Nháp") {
+        setTender(undefined);
+        setReady(true);
+        return;
+      }
 
-    const isOpen =
-      adminTender.status === "Đang mở" || adminTender.status === "Sắp đóng";
+      const isOpen =
+        adminTender.status === "Đang mở" || adminTender.status === "Sắp đóng";
 
-    const internalUser = getInternalSession();
-    if (internalUser) {
-      setTender(adminToPublicTender(adminTender));
-      setReady(true);
-      return;
-    }
+      const internalUser = getInternalSession();
+      if (internalUser) {
+        setTender(adminToPublicTender(adminTender));
+        setReady(true);
+        return;
+      }
 
-    const supplierUser = getCurrentSession();
-    if (supplierUser) {
+      const supplierUser = getCurrentSession();
+      if (supplierUser) {
+        if (isOpen) {
+          setTender(adminToPublicTender(adminTender));
+        } else {
+          const hasBid = (await getBidsBySupplier(supplierUser.id)).some(
+            (b) => b.tenderId === adminTender.id
+          );
+          if (hasBid) {
+            setTender(adminToPublicTender(adminTender));
+          } else {
+            setBlocked("supplier");
+          }
+        }
+        setReady(true);
+        return;
+      }
+
+      // guest
       if (isOpen) {
         setTender(adminToPublicTender(adminTender));
       } else {
-        const hasBid = getBidsBySupplier(supplierUser.id).some(
-          (b) => b.tenderId === adminTender.id
-        );
-        if (hasBid) {
-          setTender(adminToPublicTender(adminTender));
-        } else {
-          setBlocked("supplier");
-        }
+        setBlocked("guest");
       }
       setReady(true);
-      return;
     }
-
-    // guest
-    if (isOpen) {
-      setTender(adminToPublicTender(adminTender));
-    } else {
-      setBlocked("guest");
-    }
-    setReady(true);
+    loadData();
   }, [id]);
 
   if (!ready) {

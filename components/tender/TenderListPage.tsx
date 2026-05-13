@@ -124,38 +124,42 @@ export default function TenderListPage() {
   useEffect(() => {
     ensureCategorySeedData();
     ensureTenderSeedData();
-    setCategoryOptions(getPurchaseCategories().filter((item) => item.status === "Hoạt động"));
+    async function loadData() {
+      const categories = await getPurchaseCategories();
+      setCategoryOptions(categories.filter((item) => item.status === "Hoạt động"));
 
-    const internalUser = getInternalSession();
-    const supplierUser = getCurrentSession();
+      const internalUser = getInternalSession();
+      const supplierUser = getCurrentSession();
 
-    const allAdmin = getTenders().filter(
-      (t) => t.status !== "Nháp" && t.status !== "Đã hủy"
-    );
-
-    if (internalUser) {
-      setUserType("internal");
-      setTenders(allAdmin.map(adminToPublicTender));
-    } else if (supplierUser) {
-      setUserType("supplier");
-      const bids = getBidsBySupplier(supplierUser.id);
-      const bidTenderIds = new Set(bids.map((b) => b.tenderId));
-      const visible = allAdmin.filter(
-        (t) =>
-          t.status === "Đang mở" ||
-          t.status === "Sắp đóng" ||
-          bidTenderIds.has(t.id)
+      const allAdmin = (await getTenders()).filter(
+        (t) => t.status !== "Nháp" && t.status !== "Đã hủy"
       );
-      setTenders(visible.map(adminToPublicTender));
-    } else {
-      setUserType("guest");
-      const visible = allAdmin.filter(
-        (t) => t.status === "Đang mở" || t.status === "Sắp đóng"
-      );
-      setTenders(visible.map(adminToPublicTender));
+
+      if (internalUser) {
+        setUserType("internal");
+        setTenders(allAdmin.map(adminToPublicTender));
+      } else if (supplierUser) {
+        setUserType("supplier");
+        const bids = await getBidsBySupplier(supplierUser.id);
+        const bidTenderIds = new Set(bids.map((b) => b.tenderId));
+        const visible = allAdmin.filter(
+          (t) =>
+            t.status === "Đang mở" ||
+            t.status === "Sắp đóng" ||
+            bidTenderIds.has(t.id)
+        );
+        setTenders(visible.map(adminToPublicTender));
+      } else {
+        setUserType("guest");
+        const visible = allAdmin.filter(
+          (t) => t.status === "Đang mở" || t.status === "Sắp đóng"
+        );
+        setTenders(visible.map(adminToPublicTender));
+      }
+
+      setLoaded(true);
     }
-
-    setLoaded(true);
+    loadData();
   }, []);
 
   const filtered = useMemo(() => {

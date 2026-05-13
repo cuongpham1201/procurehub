@@ -310,23 +310,26 @@ export default function SupplierDashboardPage() {
 
   useEffect(() => {
     ensureTenderSeedData();
-    const allOpen = getTenders().filter((t) => t.status === "Đang mở" || t.status === "Sắp đóng");
-    setOpenTenders(allOpen.length);
+    async function loadData() {
+      const allOpen = (await getTenders()).filter((t) => t.status === "Đang mở" || t.status === "Sắp đóng");
+      setOpenTenders(allOpen.length);
 
-    const session = getCurrentSession();
-    if (!session) {
-      setUnbidOpenTenders(allOpen.length);
+      const session = getCurrentSession();
+      if (!session) {
+        setUnbidOpenTenders(allOpen.length);
+        setLoading(false);
+        return;
+      }
+      const accounts = await getAccounts();
+      const fresh = accounts.find((a) => a.id === session.id);
+      setAccount(fresh ?? session);
+      const bids = await getBidsBySupplier(session.id);
+      setMyBids(bids);
+      const bidTenderIds = new Set(bids.map((b) => b.tenderId));
+      setUnbidOpenTenders(allOpen.filter((t) => !bidTenderIds.has(t.id)).length);
       setLoading(false);
-      return;
     }
-    const accounts = getAccounts();
-    const fresh = accounts.find((a) => a.id === session.id);
-    setAccount(fresh ?? session);
-    const bids = getBidsBySupplier(session.id);
-    setMyBids(bids);
-    const bidTenderIds = new Set(bids.map((b) => b.tenderId));
-    setUnbidOpenTenders(allOpen.filter((t) => !bidTenderIds.has(t.id)).length);
-    setLoading(false);
+    loadData();
   }, []);
 
   if (loading) {

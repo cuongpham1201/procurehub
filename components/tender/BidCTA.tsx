@@ -47,26 +47,29 @@ export default function BidCTA({
   const [adminHref, setAdminHref] = useState("/admin/tenders");
 
   useEffect(() => {
-    const internal = getInternalSession();
-    if (internal) {
-      setUserType("internal");
-      setAdminHref(`/admin/tenders/${tenderId}`);
-      return;
+    async function loadData() {
+      const internal = getInternalSession();
+      if (internal) {
+        setUserType("internal");
+        setAdminHref(`/admin/tenders/${tenderId}`);
+        return;
+      }
+      const session = getCurrentSession();
+      if (session) {
+        setUserType("supplier");
+        const accounts = await getAccounts();
+        const fresh = accounts.find((a) => a.id === session.id) ?? session;
+        setSupplierStatus(normalizeSupplierStatus(fresh));
+        const bids = await getBidsBySupplier(session.id);
+        const found = bids.find(
+          (b) => b.tenderId === tenderId || b.tenderCode === tenderCode
+        );
+        setExistingBid(found ?? null);
+        return;
+      }
+      setUserType("guest");
     }
-    const session = getCurrentSession();
-    if (session) {
-      setUserType("supplier");
-      const accounts = getAccounts();
-      const fresh = accounts.find((a) => a.id === session.id) ?? session;
-      setSupplierStatus(normalizeSupplierStatus(fresh));
-      const bids = getBidsBySupplier(session.id);
-      const found = bids.find(
-        (b) => b.tenderId === tenderId || b.tenderCode === tenderCode
-      );
-      setExistingBid(found ?? null);
-      return;
-    }
-    setUserType("guest");
+    loadData();
   }, [tenderId, tenderCode]);
 
   const isClosed = tenderStatus && CLOSED_STATUSES.includes(tenderStatus);

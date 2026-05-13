@@ -126,13 +126,14 @@ export default function AdminBidComparisonPage() {
 
   useEffect(() => {
     ensureTenderSeedData();
-    const tenders = getTenders();
-    const bids = getBids();
-    setAllTenders(tenders);
-    setAllBids(bids);
-    // Support deep-link from tender detail page
-    const preselect = searchParams.get("tenderId");
-    if (preselect) setSelectedTenderId(preselect);
+    async function loadData() {
+      const [tenders, bids] = await Promise.all([getTenders(), getBids()]);
+      setAllTenders(tenders);
+      setAllBids(bids);
+      const preselect = searchParams.get("tenderId");
+      if (preselect) setSelectedTenderId(preselect);
+    }
+    loadData();
   }, [searchParams]);
 
   // ── derived ──────────────────────────────────────────────────────────────
@@ -182,11 +183,11 @@ export default function AdminBidComparisonPage() {
   }, [bidsWithItems]);
 
   // ── handlers ─────────────────────────────────────────────────────────────
-  function handleSelectWinner(bidId: string) {
+  async function handleSelectWinner(bidId: string) {
     const winnerBid = allBids.find((b) => b.id === bidId);
-    markBidAsWinner(bidId, selectedTenderId);
-    updateAdminTenderStatus(selectedTenderId, "Đã có kết quả");
-    addAdminActivityLog({
+    await markBidAsWinner(bidId, selectedTenderId);
+    await updateAdminTenderStatus(selectedTenderId, "Đã có kết quả");
+    await addAdminActivityLog({
       type: "winner_selected",
       title: "Đã chốt kết quả gói thầu",
       description: `Chọn ${winnerBid?.supplierName ?? "—"} cho gói ${selectedTender?.code ?? ""} – ${selectedTender?.title ?? ""}`,
@@ -195,8 +196,7 @@ export default function AdminBidComparisonPage() {
       entityCode: selectedTender?.code,
       ...actorFromSession(getInternalSession()),
     });
-    const freshBids = getBids();
-    const freshTenders = getTenders();
+    const [freshBids, freshTenders] = await Promise.all([getBids(), getTenders()]);
     setAllBids(freshBids);
     setAllTenders(freshTenders);
     setConfirmBidId(null);

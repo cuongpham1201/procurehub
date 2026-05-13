@@ -7,7 +7,9 @@ import type { SupplierBid } from "@/types/supplierBid";
 import type { AdminTender } from "@/types/adminTender";
 import { getAdminActivityLogs } from "@/services/activityStorage";
 import type { ActivityLogType, AdminActivityLog } from "@/services/activityStorage";
-import { initDemoDataIfEmpty, resetDemoData } from "@/services/demoDataStorage";
+import { getAccounts } from "@/services/supplierAccountStorage";
+import { getBids } from "@/services/supplierBidStorage";
+import { getTenders } from "@/services/tenderStorage";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -23,16 +25,6 @@ function formatActivityTime(iso: string): string {
     const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
     return `${day} ${time}`;
   } catch { return "Gần đây"; }
-}
-
-function readLS<T>(key: string): T[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T[]) : [];
-  } catch {
-    return [];
-  }
 }
 
 function formatCurrency(n: number): string {
@@ -223,12 +215,13 @@ export default function AdminDashboard() {
   const [tasks, setTasks] = useState<TaskItem[]>(MOCK_TASKS);
 
   useEffect(() => {
-    initDemoDataIfEmpty();
-
-    // Read localStorage and compute real stats
-    const suppliers = readLS<SupplierAccount>("procurehub_supplier_accounts");
-    const bids = readLS<SupplierBid>("procurehub_supplier_bids");
-    const tenders = readLS<AdminTender>("procurehub_admin_tenders");
+    async function loadData() {
+    const [suppliers, bids, tenders, activityLogs] = await Promise.all([
+      getAccounts(),
+      getBids(),
+      getTenders(),
+      getAdminActivityLogs(),
+    ]);
 
     // Normalize NCC status: profileCompleted=false → "Chưa hoàn thiện",
     // profileCompleted=true + status rỗng → "Chờ xét duyệt", else dùng status
@@ -248,7 +241,6 @@ export default function AdminDashboard() {
       return 0;
     }
 
-    const activityLogs = getAdminActivityLogs(); // already sorted DESC by createdAt
     const mappedLogs = activityLogs.slice(0, 50).map(logToActivityItem);
     setAllActivities(mappedLogs);
     setActivities(mappedLogs.slice(0, 5));
@@ -285,14 +277,9 @@ export default function AdminDashboard() {
         })
       );
     }
+    }
+    loadData();
   }, []);
-
-  function handleResetDemoData() {
-    const ok = window.confirm("Reset dữ liệu demo ProcureHub? Dữ liệu test hiện tại sẽ được tạo lại từ bộ seed.");
-    if (!ok) return;
-    resetDemoData();
-    window.location.reload();
-  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -461,16 +448,6 @@ export default function AdminDashboard() {
             </svg>
             <span className="text-sm font-medium">Trang public</span>
           </Link>
-          <button
-            type="button"
-            onClick={handleResetDemoData}
-            className="flex flex-col items-center gap-2.5 p-5 bg-white border border-amber-200 text-amber-700 rounded-xl hover:bg-amber-50 hover:border-amber-300 transition-colors text-center"
-          >
-            <svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v6h6M20 20v-6h-6M5 15a7 7 0 0012.1 2.9M19 9A7 7 0 006.9 6.1" />
-            </svg>
-            <span className="text-sm font-medium">Reset demo data</span>
-          </button>
         </div>
       </section>
 

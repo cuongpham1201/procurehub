@@ -70,7 +70,7 @@ export default function LoginPage() {
     setError("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -80,12 +80,9 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-
+    try {
       if (tab === "supplier") {
-        const account = findByCredentials(email.trim(), password);
+        const account = await findByCredentials(email.trim(), password);
         if (!account) {
           setError("Email hoặc mật khẩu nhà cung cấp không đúng.");
           return;
@@ -99,7 +96,7 @@ export default function LoginPage() {
         setCurrentSession(account);
         router.push(account.profileCompleted ? "/supplier/dashboard" : "/supplier/profile");
       } else {
-        const user = findInternalByCredentials(email.trim(), password);
+        const user = await findInternalByCredentials(email.trim(), password);
         if (!user) {
           setError("Email hoặc mật khẩu nội bộ không đúng.");
           return;
@@ -113,7 +110,9 @@ export default function LoginPage() {
         setInternalSession(user);
         router.push("/admin");
       }
-    }, 500);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

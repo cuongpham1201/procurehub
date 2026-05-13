@@ -35,7 +35,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -45,9 +45,8 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    // Micro-delay to feel like a real auth request
-    setTimeout(() => {
-      const account = findByCredentials(email, password);
+    try {
+      const account = await findByCredentials(email, password);
       setLoading(false);
       if (!account) {
         setError("Email hoặc mật khẩu không đúng.");
@@ -55,7 +54,9 @@ export default function LoginPage() {
       }
       setCurrentSession(account);
       router.push("/");
-    }, 600);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

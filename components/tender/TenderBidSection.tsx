@@ -258,20 +258,23 @@ export default function TenderBidSection({ tenderId }: { tenderId: string }) {
   const [myBid, setMyBid] = useState<SupplierBid | null>(null);
 
   useEffect(() => {
-    const internal = getInternalSession();
-    if (internal) {
-      setUserType("internal");
-      setAllBids(getBidsByTender(tenderId));
-      return;
+    async function loadData() {
+      const internal = getInternalSession();
+      if (internal) {
+        setUserType("internal");
+        setAllBids(await getBidsByTender(tenderId));
+        return;
+      }
+      const supplier = getCurrentSession();
+      if (supplier) {
+        setUserType("supplier");
+        const found = (await getBidsBySupplier(supplier.id)).find((b) => b.tenderId === tenderId);
+        setMyBid(found ?? null);
+        return;
+      }
+      setUserType("guest");
     }
-    const supplier = getCurrentSession();
-    if (supplier) {
-      setUserType("supplier");
-      const found = getBidsBySupplier(supplier.id).find((b) => b.tenderId === tenderId);
-      setMyBid(found ?? null);
-      return;
-    }
-    setUserType("guest");
+    loadData();
   }, [tenderId]);
 
   if (userType === "loading" || userType === "guest") return null;

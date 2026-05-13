@@ -200,16 +200,20 @@ export default function AdminTenderCreatePage() {
 
   useEffect(() => {
     ensureCategorySeedData();
-    const activeCategories = getPurchaseCategories().filter((category) => category.status === "Hoạt động");
-    setPurchaseCategories(activeCategories);
-    setMaterialItems(getMaterialItems());
-    setRole(getInternalSession()?.role || "Chỉ xem");
-    setForm((prev) => {
-      if (prev.category && activeCategories.some((category) => category.name === prev.category || category.code === prev.category)) {
-        return prev;
-      }
-      return { ...prev, category: activeCategories[0]?.name ?? "" };
-    });
+    async function loadData() {
+      const [categories, materials] = await Promise.all([getPurchaseCategories(), getMaterialItems()]);
+      const activeCategories = categories.filter((category) => category.status === "Hoạt động");
+      setPurchaseCategories(activeCategories);
+      setMaterialItems(materials);
+      setRole(getInternalSession()?.role || "Chỉ xem");
+      setForm((prev) => {
+        if (prev.category && activeCategories.some((category) => category.name === prev.category || category.code === prev.category)) {
+          return prev;
+        }
+        return { ...prev, category: activeCategories[0]?.name ?? "" };
+      });
+    }
+    loadData();
   }, []);
 
   const selectedCategory = useMemo(
@@ -303,8 +307,8 @@ export default function AdminTenderCreatePage() {
     setQuickMaterialRow(idx);
   }
 
-  function handleQuickMaterialCreated(material: MaterialItem) {
-    setMaterialItems(getMaterialItems());
+  async function handleQuickMaterialCreated(material: MaterialItem) {
+    setMaterialItems(await getMaterialItems());
     if (quickMaterialRow !== null) {
       setItems((prev) =>
         prev.map((item, i) =>
@@ -357,10 +361,10 @@ export default function AdminTenderCreatePage() {
     return Object.keys(errs).length === 0;
   }
 
-  function buildTender(status: "Nháp" | "Đang mở"): AdminTender {
+  async function buildTender(status: "Nháp" | "Đang mở"): Promise<AdminTender> {
     return {
       id: generateTenderId(),
-      code: generateTenderCode(),
+      code: await generateTenderCode(),
       title: form.title.trim(),
       category: form.category,
       status,
@@ -389,17 +393,17 @@ export default function AdminTenderCreatePage() {
     };
   }
 
-  function handleSaveDraft() {
+  async function handleSaveDraft() {
     if (!validate()) return;
-    const tender = buildTender("Nháp");
-    saveAdminTender(tender);
+    const tender = await buildTender("Nháp");
+    await saveAdminTender(tender);
     setSaved(tender);
   }
 
-  function handlePublish() {
+  async function handlePublish() {
     if (!validate()) return;
-    const tender = buildTender("Đang mở");
-    saveAdminTender(tender);
+    const tender = await buildTender("Đang mở");
+    await saveAdminTender(tender);
     setSaved(tender);
   }
 

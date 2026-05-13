@@ -55,8 +55,10 @@ export default function AdminSuppliersPage() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setAccounts(getAccounts());
-    setLoaded(true);
+    getAccounts().then((items) => {
+      setAccounts(items);
+      setLoaded(true);
+    });
   }, []);
 
   const filtered = accounts.filter((a) => {

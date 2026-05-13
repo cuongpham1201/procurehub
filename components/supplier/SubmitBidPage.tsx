@@ -255,26 +255,29 @@ export default function SubmitBidPage() {
   const [globalError, setGlobalError] = useState("");
 
   useEffect(() => {
-    ensureTenderSeedData();
-    const session = getCurrentSession();
-    if (session) {
-      const accounts = getAccounts();
-      const fresh = accounts.find((a) => a.id === session.id) ?? session;
-      setAccount(fresh);
-    } else {
-      setAccount(null);
-    }
-    const found = getAdminTenderById(tenderId);
-    if (found) {
-      setAdminTender(found);
-      setTender(adminToPublicTender(found));
-      setItemForms(found.items.map(() => ({ unitPrice: "", brand: "", origin: "", note: "" })));
+    async function loadData() {
+      ensureTenderSeedData();
+      const session = getCurrentSession();
       if (session) {
-        const existing = getBidsBySupplier(session.id).find((b) => b.tenderId === found.id);
-        if (existing) setAlreadySubmitted(true);
+        const accounts = await getAccounts();
+        const fresh = accounts.find((a) => a.id === session.id) ?? session;
+        setAccount(fresh);
+      } else {
+        setAccount(null);
       }
+      const found = await getAdminTenderById(tenderId);
+      if (found) {
+        setAdminTender(found);
+        setTender(adminToPublicTender(found));
+        setItemForms(found.items.map(() => ({ unitPrice: "", brand: "", origin: "", note: "" })));
+        if (session) {
+          const existing = (await getBidsBySupplier(session.id)).find((b) => b.tenderId === found.id);
+          if (existing) setAlreadySubmitted(true);
+        }
+      }
+      setLoading(false);
     }
-    setLoading(false);
+    loadData();
   }, [tenderId]);
 
   if (loading) {
@@ -353,14 +356,14 @@ export default function SubmitBidPage() {
     setGlobalError("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!tender || !adminTender || !account) return;
     if (normalizeSupplierStatus(account) !== "Đã duyệt") {
       setGlobalError("Tài khoản chưa được duyệt. Không thể nộp báo giá.");
       return;
     }
-    const freshTender = getAdminTenderById(adminTender.id);
+    const freshTender = await getAdminTenderById(adminTender.id);
     const freshTenderReceivingBids =
       freshTender?.status === "Đang mở" || freshTender?.status === "Sắp đóng";
     if (!freshTender || !freshTenderReceivingBids || !isDateTodayOrFuture(freshTender.deadline)) {
@@ -413,7 +416,7 @@ export default function SubmitBidPage() {
     });
 
     const total = bidItems.reduce((s, item) => s + item.amount, 0);
-    const bidCode = generateBidCode();
+    const bidCode = await generateBidCode();
     const bid: SupplierBid = {
       id: generateBidId(),
       bidCode,
@@ -432,7 +435,7 @@ export default function SubmitBidPage() {
       note: header.note.trim() || undefined,
       items: bidItems,
     };
-    saveBid(bid);
+    await saveBid(bid);
     setSavedBidCode(bidCode);
   }
 

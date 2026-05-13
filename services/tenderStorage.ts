@@ -1,29 +1,17 @@
+import { apiDelete, apiGet, apiPost, apiPut } from "@/services/apiClient";
+import { addAdminActivityLog } from "@/services/activityStorage";
+import { getBids, deleteBid } from "@/services/supplierBidStorage";
+import {
+  formatDisplayDate,
+  getTodayDateString,
+  isDateBeforeToday,
+  isDateTodayOrFuture,
+  toDateInputValue,
+} from "@/services/dateUtils";
 import type { AdminTender, AdminTenderStatus } from "@/types/adminTender";
 import type { Tender, TenderStatus } from "@/types/tender";
-import { addAdminActivityLog } from "@/services/activityStorage";
-import { formatDisplayDate, getTodayDateString, isDateBeforeToday, isDateTodayOrFuture, toDateInputValue } from "@/services/dateUtils";
-import { initDemoDataIfEmpty, resetDemoData } from "@/services/demoDataStorage";
 
-const KEY = "procurehub_admin_tenders";
-const BIDS_KEY = "procurehub_supplier_bids";
 const CLOSING_SOON_DAYS = 3;
-
-// ── Đọc / ghi cơ bản ────────────────────────────────────────────────────────
-
-function readStoredTenders(): AdminTender[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as AdminTender[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredTenders(tenders: AdminTender[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(tenders));
-}
 
 function daysUntilDate(value: string): number | null {
   const dateValue = toDateInputValue(value);
@@ -38,99 +26,73 @@ function deadlineStatusForTender(tender: AdminTender): AdminTenderStatus {
   if (tender.status !== "Đang mở" && tender.status !== "Sắp đóng") {
     return tender.status;
   }
-
-  if (isDateBeforeToday(tender.deadline)) {
-    return "Đã đóng";
-  }
-
+  if (isDateBeforeToday(tender.deadline)) return "Đã đóng";
   const daysLeft = daysUntilDate(tender.deadline);
-  if (daysLeft !== null && daysLeft >= 0 && daysLeft <= CLOSING_SOON_DAYS) {
-    return "Sắp đóng";
-  }
-
+  if (daysLeft !== null && daysLeft >= 0 && daysLeft <= CLOSING_SOON_DAYS) return "Sắp đóng";
   return "Đang mở";
 }
 
-export function syncExpiredTenders(): AdminTender[] {
-  if (typeof window === "undefined") return [];
-  initDemoDataIfEmpty();
-  const existing = readStoredTenders();
-  const closedTenders: AdminTender[] = [];
-  const closingSoonTenders: AdminTender[] = [];
-  let changed = false;
-  const now = new Date().toISOString();
-  const synced = existing.map((tender) => {
+export async function syncExpiredTenders(): Promise<AdminTender[]> {
+  const existing = await apiGet<AdminTender[]>("/api/tenders").catch(() => []);
+  const synced: AdminTender[] = [];
+
+  for (const tender of existing) {
     const nextStatus = deadlineStatusForTender(tender);
     if (nextStatus === tender.status) {
-      return tender;
+      synced.push(tender);
+      continue;
     }
-    changed = true;
     const updated: AdminTender = {
       ...tender,
       status: nextStatus,
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     };
-    if (nextStatus === "Đã đóng") closedTenders.push(updated);
-    if (nextStatus === "Sắp đóng") closingSoonTenders.push(updated);
-    return updated;
-  });
-
-  if (!changed) return existing;
-
-  writeStoredTenders(synced);
-  closingSoonTenders.forEach((tender) => {
-    addAdminActivityLog({
+    await saveAdminTender(updated);
+    synced.push(updated);
+    await addAdminActivityLog({
       type: "tender_status",
-      title: "Tự động đánh dấu sắp đóng",
-      description: `${tender.code} còn không quá ${CLOSING_SOON_DAYS} ngày đến hạn nộp và được chuyển sang Sắp đóng`,
+      title: nextStatus === "Sắp đóng" ? "Tự động đánh dấu sắp đóng" : "Tự động đóng gói thầu",
+      description:
+        nextStatus === "Sắp đóng"
+          ? `${tender.code} còn không quá ${CLOSING_SOON_DAYS} ngày đến hạn nộp và được chuyển sang Sắp đóng`
+          : `${tender.code} đã quá hạn nộp và được chuyển sang Đã đóng`,
       entityType: "tender",
       entityId: tender.id,
       entityCode: tender.code,
     });
-  });
-  closedTenders.forEach((tender) => {
-    addAdminActivityLog({
-      type: "tender_status",
-      title: "Tự động đóng gói thầu",
-      description: `${tender.code} đã quá hạn nộp và được chuyển sang Đã đóng`,
-      entityType: "tender",
-      entityId: tender.id,
-      entityCode: tender.code,
-    });
-  });
+  }
+
   return synced;
 }
 
-export function getTenders(): AdminTender[] {
+export async function getTenders(): Promise<AdminTender[]> {
   return syncExpiredTenders();
 }
 
-// alias giữ nguyên tên cũ để không phá import hiện có
 export const getAdminTenders = getTenders;
 
-export function saveAdminTender(tender: AdminTender): void {
-  const existing = getTenders();
-  const idx = existing.findIndex((t) => t.id === tender.id);
-  if (idx >= 0) {
-    existing[idx] = tender;
-  } else {
-    existing.push(tender);
+export async function saveAdminTender(tender: AdminTender): Promise<void> {
+  await apiPost<AdminTender>("/api/tenders", tender);
+}
+
+export async function updateAdminTenderStatus(id: string, status: AdminTenderStatus): Promise<void> {
+  const tender = await getAdminTenderById(id);
+  if (!tender) return;
+  await apiPut<AdminTender>(`/api/tenders/${encodeURIComponent(tender.id)}`, {
+    ...tender,
+    status,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function getAdminTenderById(id: string): Promise<AdminTender | null> {
+  try {
+    return await apiGet<AdminTender | null>(`/api/tenders/${encodeURIComponent(id)}`);
+  } catch {
+    return null;
   }
-  writeStoredTenders(existing);
 }
 
-export function updateAdminTenderStatus(id: string, status: AdminTenderStatus): void {
-  const list = getTenders().map((t) =>
-    t.id === id || t.code === id ? { ...t, status, updatedAt: new Date().toISOString() } : t
-  );
-  writeStoredTenders(list);
-}
-
-export function getAdminTenderById(id: string): AdminTender | null {
-  return getTenders().find((t) => t.id === id || t.code === id) ?? null;
-}
-
-// alias theo tên mới
 export const getTenderById = getAdminTenderById;
 
 function isBidRelatedToTender(
@@ -145,50 +107,32 @@ function isBidRelatedToTender(
   );
 }
 
-function getBidsForTender(tender: AdminTender): { tenderId?: string; tenderCode?: string }[] {
-  try {
-    const raw = localStorage.getItem(BIDS_KEY);
-    const bids = raw ? (JSON.parse(raw) as { tenderId?: string; tenderCode?: string }[]) : [];
-    return bids.filter((b) => isBidRelatedToTender(b, tender));
-  } catch {
-    return [];
-  }
-}
-
-export function deleteTender(id: string): void {
-  const tender = getAdminTenderById(id);
-  const remaining = getTenders().filter((t) => t.id !== id && t.code !== id);
-  writeStoredTenders(remaining);
+export async function deleteTender(id: string): Promise<void> {
+  const tender = await getAdminTenderById(id);
+  await apiDelete<boolean>(`/api/tenders/${encodeURIComponent(id)}`);
   if (!tender) return;
-  try {
-    const raw = localStorage.getItem(BIDS_KEY);
-    const bids = raw ? (JSON.parse(raw) as { tenderId?: string; tenderCode?: string }[]) : [];
-    const cleaned = bids.filter((b) => !isBidRelatedToTender(b, tender));
-    localStorage.setItem(BIDS_KEY, JSON.stringify(cleaned));
-  } catch {
-    // Không chặn thao tác xóa gói thầu nếu dữ liệu báo giá test bị lỗi.
-  }
+  const relatedBids = (await getBids()).filter((bid) => isBidRelatedToTender(bid, tender));
+  await Promise.all(relatedBids.map((bid) => deleteBid(bid.id)));
 }
 
-export function reopenTender(id: string, newDeadline: string): AdminTender | null {
-  const tender = getAdminTenderById(id);
+export async function reopenTender(id: string, newDeadline: string): Promise<AdminTender | null> {
+  const tender = await getAdminTenderById(id);
   if (!tender || tender.status !== "Đã đóng") return null;
   const normalizedDeadline = toDateInputValue(newDeadline);
   if (!normalizedDeadline || !isDateTodayOrFuture(normalizedDeadline)) return null;
-  const updated = {
+  const updated: AdminTender = {
     ...tender,
-    status: "Đang mở" as AdminTenderStatus,
+    status: "Đang mở",
     deadline: normalizedDeadline,
     updatedAt: new Date().toISOString(),
   };
-  saveAdminTender(updated);
+  await saveAdminTender(updated);
   return updated;
 }
 
-export function generateTenderCode(): string {
+export async function generateTenderCode(): Promise<string> {
   const year = new Date().getFullYear();
-  const existing = getTenders();
-  const nums = existing
+  const nums = (await getTenders())
     .map((t) => t.code)
     .filter((c) => c.startsWith(`GT-${year}-`))
     .map((c) => parseInt(c.slice(-3), 10))
@@ -201,29 +145,19 @@ export function generateTenderId(): string {
   return `TENDER-${Date.now()}`;
 }
 
-/**
- * Seed dữ liệu demo vào localStorage nếu browser chưa có dữ liệu ProcureHub.
- * Không ghi đè dữ liệu đã có.
- */
 export function ensureTenderSeedData(): void {
-  initDemoDataIfEmpty();
+  // PostgreSQL is now the source of truth. Kept as a no-op for existing imports.
 }
 
-/**
- * Xóa dữ liệu demo chính rồi seed lại từ đầu.
- * Chỉ dùng trong dev/test — không gọi khi production.
- */
-export function resetTenderSeedData(): void {
-  resetDemoData();
+export async function resetTenderSeedData(): Promise<void> {
+  // Demo reset is intentionally no longer localStorage-backed.
 }
-
-// ── Chuyển đổi AdminTender → Tender (public shape) ──────────────────────────
 
 export function adminToPublicTender(t: AdminTender): Tender {
   const statusMap: Record<string, TenderStatus> = {
-    "Đang mở":       "Đang mở",
-    "Sắp đóng":      "Sắp đóng",
-    "Đã đóng":       "Đã đóng",
+    "Đang mở": "Đang mở",
+    "Sắp đóng": "Sắp đóng",
+    "Đã đóng": "Đã đóng",
     "Đang đánh giá": "Đã đóng",
     "Đã có kết quả": "Đã có kết quả",
   };

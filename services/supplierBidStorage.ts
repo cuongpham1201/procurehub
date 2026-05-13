@@ -1,54 +1,51 @@
+import { apiDelete, apiGet, apiPost, apiPut } from "@/services/apiClient";
 import type { SupplierBid, BidStatus } from "@/types/supplierBid";
-import { initDemoDataIfEmpty } from "@/services/demoDataStorage";
 
-const BIDS_KEY = "procurehub_supplier_bids";
-
-export function getBids(): SupplierBid[] {
-  if (typeof window === "undefined") return [];
-  initDemoDataIfEmpty();
+export async function getBids(): Promise<SupplierBid[]> {
   try {
-    const raw = localStorage.getItem(BIDS_KEY);
-    return raw ? (JSON.parse(raw) as SupplierBid[]) : [];
+    return await apiGet<SupplierBid[]>("/api/bids");
   } catch {
     return [];
   }
 }
 
-export function saveBid(bid: SupplierBid): void {
-  const existing = getBids();
-  localStorage.setItem(BIDS_KEY, JSON.stringify([...existing, bid]));
+export async function saveBid(bid: SupplierBid): Promise<void> {
+  await apiPost<SupplierBid>("/api/bids", bid);
 }
 
-export function getBidById(id: string): SupplierBid | undefined {
-  return getBids().find((b) => b.id === id);
+export async function getBidById(id: string): Promise<SupplierBid | undefined> {
+  return (await getBids()).find((b) => b.id === id);
 }
 
-export function getBidsBySupplier(supplierId: string): SupplierBid[] {
-  return getBids().filter((b) => b.supplierId === supplierId);
+export async function getBidsBySupplier(supplierId: string): Promise<SupplierBid[]> {
+  return (await getBids()).filter((b) => b.supplierId === supplierId);
 }
 
-export function getBidsByTender(tenderId: string): SupplierBid[] {
-  return getBids().filter((b) => b.tenderId === tenderId);
+export async function getBidsByTender(tenderId: string): Promise<SupplierBid[]> {
+  return (await getBids()).filter((b) => b.tenderId === tenderId);
 }
 
-export function updateBidStatus(id: string, status: BidStatus): void {
-  const bids = getBids().map((b) => (b.id === id ? { ...b, status } : b));
-  localStorage.setItem(BIDS_KEY, JSON.stringify(bids));
+export async function updateBidStatus(id: string, status: BidStatus): Promise<void> {
+  const bid = (await getBidById(id));
+  if (!bid) return;
+  await apiPut<SupplierBid>(`/api/bids/${encodeURIComponent(id)}`, { ...bid, status });
 }
 
-export function markBidAsWinner(winningBidId: string, tenderId: string): void {
-  const bids = getBids().map((b): SupplierBid => {
-    if (b.tenderId !== tenderId) return b;
-    const status: BidStatus = b.id === winningBidId ? "Được chọn" : "Không được chọn";
-    return { ...b, status };
-  });
-  localStorage.setItem(BIDS_KEY, JSON.stringify(bids));
+export async function markBidAsWinner(winningBidId: string, tenderId: string): Promise<void> {
+  const bids = await getBids();
+  await Promise.all(
+    bids
+      .filter((b) => b.tenderId === tenderId)
+      .map((b) => {
+        const status: BidStatus = b.id === winningBidId ? "Được chọn" : "Không được chọn";
+        return apiPut<SupplierBid>(`/api/bids/${encodeURIComponent(b.id)}`, { ...b, status });
+      }),
+  );
 }
 
-export function generateBidCode(): string {
+export async function generateBidCode(): Promise<string> {
   const year = new Date().getFullYear();
-  const existing = getBids();
-  const nums = existing
+  const nums = (await getBids())
     .map((b) => b.bidCode ?? "")
     .filter((c) => c.startsWith(`BG-${year}-`))
     .map((c) => parseInt(c.slice(-3), 10))
@@ -61,7 +58,6 @@ export function generateBidId(): string {
   return `BID-${Date.now()}`;
 }
 
-export function deleteBid(id: string): void {
-  const bids = getBids().filter((b) => b.id !== id);
-  localStorage.setItem(BIDS_KEY, JSON.stringify(bids));
+export async function deleteBid(id: string): Promise<void> {
+  await apiDelete<boolean>(`/api/bids/${encodeURIComponent(id)}`);
 }

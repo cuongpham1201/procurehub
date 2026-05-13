@@ -173,7 +173,7 @@ export default function SupplierProfilePage() {
     return e;
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!account) return;
     const errs = validate();
@@ -188,7 +188,7 @@ export default function SupplierProfilePage() {
       profileCompleted: true,
       status: "Chờ xét duyệt",
     };
-    updateAccount(updated);
+    await updateAccount(updated);
     setCurrentSession(updated);
     setAccount(updated);
     setSaved(true);

@@ -176,27 +176,34 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
   useEffect(() => {
     ensureTenderSeedData();
     ensureCategorySeedData();
-    const found = getAdminTenderById(id);
-    setTender(found ?? null);
-    setPurchaseCategories(getPurchaseCategories().filter((category) => category.status === "Hoạt động"));
-    setMaterialItems(getMaterialItems());
+    async function loadData() {
+      const [found, categories, materials, allBids] = await Promise.all([
+        getAdminTenderById(id),
+        getPurchaseCategories(),
+        getMaterialItems(),
+        getBids(),
+      ]);
+      setTender(found ?? null);
+      setPurchaseCategories(categories.filter((category) => category.status === "Hoạt động"));
+      setMaterialItems(materials);
 
-    const allBids = getBids();
-    const code = found?.code ?? "";
-    setBids(allBids.filter((b) => b.tenderId === id || b.tenderCode === code));
+      const code = found?.code ?? "";
+      setBids(allBids.filter((b) => b.tenderId === id || b.tenderCode === code));
 
-    const session = getInternalSession();
-    setRole(session?.role || "Chỉ xem");
+      const session = getInternalSession();
+      setRole(session?.role || "Chỉ xem");
+    }
+    loadData();
   }, [id]);
 
-  function handleStatus(newStatus: AdminTenderStatus) {
+  async function handleStatus(newStatus: AdminTenderStatus) {
     if (!tender) return;
     const oldStatus = tender.status;
-    updateAdminTenderStatus(tender.id, newStatus);
+    await updateAdminTenderStatus(tender.id, newStatus);
     setTender({ ...tender, status: newStatus });
     setSuccessMsg("Đã cập nhật trạng thái gói thầu.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    addAdminActivityLog({
+    await addAdminActivityLog({
       type: "tender_status",
       title: "Cập nhật trạng thái gói thầu",
       description: `${tender.code} chuyển từ ${oldStatus} sang ${newStatus}`,
@@ -213,7 +220,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setShowReopenForm(true);
   }
 
-  function handleReopenTender() {
+  async function handleReopenTender() {
     if (!tender || role !== "Admin" || tender.status !== "Đã đóng") return;
     const normalizedDeadline = toDateInputValue(reopenDeadline);
     if (!normalizedDeadline) {
@@ -225,7 +232,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
       return;
     }
     if (!window.confirm("Xác nhận mở thầu lại gói thầu với hạn nộp mới?")) return;
-    const updated = reopenTender(tender.id, normalizedDeadline);
+    const updated = await reopenTender(tender.id, normalizedDeadline);
     if (!updated) {
       setReopenError("Không thể mở thầu lại với hạn nộp này.");
       return;
@@ -235,7 +242,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setReopenError("");
     setSuccessMsg("Đã mở thầu lại gói thầu.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    addAdminActivityLog({
+    await addAdminActivityLog({
       type: "tender_status",
       title: "Mở thầu lại",
       description: `${tender.code} được mở lại với hạn nộp mới ${formatDisplayDate(normalizedDeadline)}`,
@@ -246,7 +253,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     });
   }
 
-  function handleDeleteTender() {
+  async function handleDeleteTender() {
     if (!tender || role !== "Admin") return;
     const hasBids = bids.length > 0;
     const message = hasBids
@@ -254,8 +261,8 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
       : "Xác nhận xóa gói thầu này? Thao tác này chỉ áp dụng cho dữ liệu test localStorage.";
     if (!window.confirm(message)) return;
 
-    deleteTender(tender.id);
-    addAdminActivityLog({
+    await deleteTender(tender.id);
+    await addAdminActivityLog({
       type: "system",
       title: "Đã xóa gói thầu",
       description: `Xóa ${tender.code} – ${tender.title} khỏi dữ liệu test`,
@@ -373,8 +380,8 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setQuickMaterialRow(idx);
   }
 
-  function handleQuickMaterialCreated(material: MaterialItem) {
-    setMaterialItems(getMaterialItems());
+  async function handleQuickMaterialCreated(material: MaterialItem) {
+    setMaterialItems(await getMaterialItems());
     setForm((prev) => {
       if (!prev || quickMaterialRow === null) return prev;
       const items = prev.items.map((item, i) =>
@@ -426,7 +433,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     );
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form || !tender) return;
     const errors: Record<string, string> = {};
     if (!form.title.trim()) errors.title = "Tên gói thầu không được rỗng.";
@@ -483,7 +490,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
       updatedAt: new Date().toISOString(),
     };
 
-    saveAdminTender(updated);
+    await saveAdminTender(updated);
     setTender(updated);
     setIsEditing(false);
     setForm(null);

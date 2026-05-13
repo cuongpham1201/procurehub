@@ -56,7 +56,7 @@ export default function QuickMaterialModal({
     });
   }
 
-  function submit() {
+  async function submit() {
     const nextErrors: Partial<Record<keyof QuickMaterialForm | "duplicate", string>> = {};
     const materialCode = form.materialCode.trim();
     const materialName = form.materialName.trim();
@@ -74,7 +74,7 @@ export default function QuickMaterialModal({
       return;
     }
 
-    const material = createMaterialItem(
+    const material = await createMaterialItem(
       {
         categoryId: category.id,
         categoryName: category.name,
@@ -88,10 +88,10 @@ export default function QuickMaterialModal({
       { skipLog: true },
     );
 
-    addAdminActivityLog({
+    await addAdminActivityLog({
       type: "system",
       title: "Thêm mã vật tư",
-      description: `Thêm nhanh ${material.materialCode} — ${material.materialName} khi tạo gói thầu`,
+      description: `Thêm nhanh ${material.materialCode} - ${material.materialName} khi tạo gói thầu`,
       entityType: "material",
       entityId: material.id,
       entityCode: material.materialCode,
@@ -200,4 +200,3 @@ export default function QuickMaterialModal({
     </div>
   );
 }
-

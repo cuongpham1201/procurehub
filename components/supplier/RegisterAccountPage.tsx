@@ -139,23 +139,23 @@ export default function RegisterAccountPage() {
   }
 
   // Realtime duplicate check khi blur khỏi field
-  function handleBlurEmail() {
-    if (form.email && isEmailExists(form.email)) {
+  async function handleBlurEmail() {
+    if (form.email && await isEmailExists(form.email)) {
       setErrors((prev) => ({ ...prev, email: "Email đã được sử dụng." }));
     }
   }
-  function handleBlurTaxCode() {
-    if (form.taxCode && isTaxCodeExists(form.taxCode)) {
+  async function handleBlurTaxCode() {
+    if (form.taxCode && await isTaxCodeExists(form.taxCode)) {
       setErrors((prev) => ({ ...prev, taxCode: "Mã số thuế đã tồn tại trong hệ thống." }));
     }
   }
-  function handleBlurPhone() {
-    if (form.phone && isPhoneExists(form.phone)) {
+  async function handleBlurPhone() {
+    if (form.phone && await isPhoneExists(form.phone)) {
       setErrors((prev) => ({ ...prev, phone: "Số điện thoại đã được đăng ký." }));
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length > 0) {
@@ -163,19 +163,19 @@ export default function RegisterAccountPage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    if (isEmailExists(form.email)) {
+    if (await isEmailExists(form.email)) {
       setErrors((prev) => ({ ...prev, email: "Email đã được sử dụng." }));
       setGlobalError("Email đã tồn tại trong hệ thống. Vui lòng dùng email khác hoặc đăng nhập.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    if (isTaxCodeExists(form.taxCode)) {
+    if (await isTaxCodeExists(form.taxCode)) {
       setErrors((prev) => ({ ...prev, taxCode: "Mã số thuế đã tồn tại trong hệ thống." }));
       setGlobalError("Mã số thuế đã tồn tại. Mỗi doanh nghiệp chỉ đăng ký một tài khoản.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    if (isPhoneExists(form.phone)) {
+    if (await isPhoneExists(form.phone)) {
       setErrors((prev) => ({ ...prev, phone: "Số điện thoại đã được đăng ký." }));
       setGlobalError("Số điện thoại đã tồn tại trong hệ thống. Vui lòng dùng số khác hoặc đăng nhập.");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -194,7 +194,7 @@ export default function RegisterAccountPage() {
       status: "Chưa hoàn thiện hồ sơ",
       createdAt: new Date().toISOString(),
     };
-    saveAccount(account);
+    await saveAccount(account);
     setSavedId(id);
   }
 

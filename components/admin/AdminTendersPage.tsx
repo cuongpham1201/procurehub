@@ -96,19 +96,25 @@ export default function AdminTendersPage() {
   useEffect(() => {
     ensureCategorySeedData();
     ensureTenderSeedData();
-    setCategoryOptions(getPurchaseCategories().filter((category) => category.status === "Hoạt động"));
-    const allTenders = getAdminTenders();
-    const bids = getBids();
-    const bidCountByTender = (tender: AdminTender) =>
-      bids.filter(
-        (b) =>
-          b.tenderCode === tender.code ||
-          b.tenderCode === tender.id ||
-          b.tenderId === tender.id ||
-          b.tenderId === tender.code
-      ).length;
-    setRows(allTenders.map((t) => adminToRow(t, bidCountByTender(t))));
-    setLoaded(true);
+    async function loadData() {
+      const [categories, allTenders, bids] = await Promise.all([
+        getPurchaseCategories(),
+        getAdminTenders(),
+        getBids(),
+      ]);
+      setCategoryOptions(categories.filter((category) => category.status === "Hoạt động"));
+      const bidCountByTender = (tender: AdminTender) =>
+        bids.filter(
+          (b) =>
+            b.tenderCode === tender.code ||
+            b.tenderCode === tender.id ||
+            b.tenderId === tender.id ||
+            b.tenderId === tender.code
+        ).length;
+      setRows(allTenders.map((t) => adminToRow(t, bidCountByTender(t))));
+      setLoaded(true);
+    }
+    loadData();
   }, []);
 
   function handleSort(field: SortField) {

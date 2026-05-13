@@ -301,7 +301,7 @@ function SuccessState({ supplierId, onReset }: { supplierId: string; onReset: ()
       </div>
 
       <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto mb-8 px-4 py-3 bg-amber-50 rounded-lg border border-amber-100">
-        💡 Chức năng gửi thật sẽ được kết nối ở giai đoạn backend. Thông tin đã được lưu vào <strong>localStorage</strong> của trình duyệt với key <code className="bg-amber-100 px-1 rounded">procurehub_suppliers</code>.
+        Thông tin đã được lưu vào hệ thống và sẽ hiển thị trong màn quản trị nhà cung cấp.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -361,7 +361,7 @@ export default function SupplierRegisterPage() {
     set("categories", next);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError("");
 
@@ -372,7 +372,7 @@ export default function SupplierRegisterPage() {
       return;
     }
 
-    if (isTaxCodeExists(form.taxCode)) {
+    if (await isTaxCodeExists(form.taxCode)) {
       setGlobalError("Mã số thuế này đã được đăng ký trong hệ thống demo.");
       setErrors((prev) => ({ ...prev, taxCode: "Mã số thuế đã tồn tại." }));
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -398,7 +398,7 @@ export default function SupplierRegisterPage() {
       createdAt:       new Date().toISOString(),
     };
 
-    saveSupplier(supplier);
+    await saveSupplier(supplier);
     setSavedId(id);
     setSubmitted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });

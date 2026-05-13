@@ -141,13 +141,16 @@ export default function SupplierBidsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const session = getCurrentSession();
-    if (!session) { setLoading(false); return; }
-    setLoggedIn(true);
-    setCompanyName(session.companyName);
-    const myBids = getBidsBySupplier(session.id);
-    setBids(myBids.slice().sort((a, b) => (bidDate(b)).localeCompare(bidDate(a))));
-    setLoading(false);
+    async function loadData() {
+      const session = getCurrentSession();
+      if (!session) { setLoading(false); return; }
+      setLoggedIn(true);
+      setCompanyName(session.companyName);
+      const myBids = await getBidsBySupplier(session.id);
+      setBids(myBids.slice().sort((a, b) => (bidDate(b)).localeCompare(bidDate(a))));
+      setLoading(false);
+    }
+    loadData();
   }, []);
 
   if (loading) {

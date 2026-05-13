@@ -150,24 +150,26 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const all = getAccounts();
-    const found = all.find((a) => a.id === id) ?? null;
-    setAccount(found);
-    const allBids = getBids();
-    setBids(allBids.filter((b) => b.supplierId === id));
-    const session = getInternalSession();
-    setRole(session?.role || "Chỉ xem");
+    async function loadData() {
+      const [all, allBids] = await Promise.all([getAccounts(), getBids()]);
+      const found = all.find((a) => a.id === id) ?? null;
+      setAccount(found);
+      setBids(allBids.filter((b) => b.supplierId === id));
+      const session = getInternalSession();
+      setRole(session?.role || "Chỉ xem");
+    }
+    loadData();
   }, [id]);
 
-  function handleAction(newStatus: ActionKey) {
+  async function handleAction(newStatus: ActionKey) {
     if (!account) return;
     const oldStatus = account.status || "Chưa xác định";
     const updated: SupplierAccount = { ...account, status: newStatus };
-    updateAccount(updated);
+    await updateAccount(updated);
     setAccount(updated);
     setSuccessMsg("Đã cập nhật trạng thái nhà cung cấp.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    addAdminActivityLog({
+    await addAdminActivityLog({
       type: "supplier_profile",
       title: "Cập nhật hồ sơ nhà cung cấp",
       description: `${account.companyName} chuyển từ "${oldStatus}" sang "${newStatus}"`,
@@ -206,7 +208,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form || !account) return;
     const errors: Record<string, string> = {};
 
@@ -218,7 +220,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
 
     if (!errors.email) {
       const normEmail = form.email.trim().toLowerCase();
-      const dup = getAccounts().find(
+      const dup = (await getAccounts()).find(
         (a) => a.id !== id && a.email.trim().toLowerCase() === normEmail
       );
       if (dup) errors.email = "Email đã được sử dụng bởi nhà cung cấp khác.";
@@ -226,7 +228,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
 
     if (!errors.taxCode) {
       const normTax = form.taxCode.trim().replace(/\s/g, "").toLowerCase();
-      const dup = getAccounts().find(
+      const dup = (await getAccounts()).find(
         (a) => a.id !== id && a.taxCode.trim().replace(/\s/g, "").toLowerCase() === normTax
       );
       if (dup) errors.taxCode = "Mã số thuế đã tồn tại ở nhà cung cấp khác.";
@@ -234,7 +236,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
 
     if (!errors.phone) {
       const normPhone = normalizePhone(form.phone.trim());
-      const dup = getAccounts().find(
+      const dup = (await getAccounts()).find(
         (a) => a.id !== id && normalizePhone(a.phone.trim()) === normPhone
       );
       if (dup) errors.phone = "Số điện thoại đã đăng ký bởi nhà cung cấp khác.";
@@ -259,7 +261,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
       categories: form.categories,
     };
 
-    updateAccount(updated);
+    await updateAccount(updated);
     setAccount(updated);
 
     // Sync supplier session if they're the same person

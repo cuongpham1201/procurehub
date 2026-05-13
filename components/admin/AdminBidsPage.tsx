@@ -120,13 +120,13 @@ export default function AdminBidsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
-    setBids(getBids());
+    getBids().then(setBids);
   }, []);
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     const target = bids.find((b) => b.id === id);
     if (target) {
-      addAdminActivityLog({
+      await addAdminActivityLog({
         type: "bid_deleted",
         title: "Đã xóa báo giá test",
         description: `Xóa ${target.bidCode ?? target.id} của ${target.supplierName} – ${target.tenderCode}`,
@@ -136,8 +136,8 @@ export default function AdminBidsPage() {
         ...actorFromSession(getInternalSession()),
       });
     }
-    deleteBid(id);
-    setBids(getBids());
+    await deleteBid(id);
+    setBids(await getBids());
     setConfirmDeleteId(null);
   }
 
