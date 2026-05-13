@@ -1,4 +1,5 @@
 import type { InternalUser } from "@/types/internalUser";
+import { initDemoDataIfEmpty } from "@/services/demoDataStorage";
 
 const INTERNAL_SESSION_KEY = "procurehub_current_internal_user";
 const ADMIN_USERS_KEY = "procurehub_admin_users";
@@ -21,6 +22,7 @@ export const MOCK_ADMIN: InternalUser = {
 
 export function getAdminUsers(): InternalUser[] {
   if (typeof window === "undefined") return [];
+  initDemoDataIfEmpty();
   try {
     const raw = localStorage.getItem(ADMIN_USERS_KEY);
     return raw ? (JSON.parse(raw) as InternalUser[]) : [];

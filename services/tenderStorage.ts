@@ -1,8 +1,8 @@
-import type { AdminTender, AdminTenderStatus, AdminTenderCategory } from "@/types/adminTender";
+import type { AdminTender, AdminTenderStatus } from "@/types/adminTender";
 import type { Tender, TenderStatus } from "@/types/tender";
-import { tenders as MOCK_TENDERS } from "@/data/tenders";
 import { addAdminActivityLog } from "@/services/activityStorage";
 import { formatDisplayDate, getTodayDateString, isDateBeforeToday, isDateTodayOrFuture, toDateInputValue } from "@/services/dateUtils";
+import { initDemoDataIfEmpty, resetDemoData } from "@/services/demoDataStorage";
 
 const KEY = "procurehub_admin_tenders";
 const BIDS_KEY = "procurehub_supplier_bids";
@@ -53,6 +53,7 @@ function deadlineStatusForTender(tender: AdminTender): AdminTenderStatus {
 
 export function syncExpiredTenders(): AdminTender[] {
   if (typeof window === "undefined") return [];
+  initDemoDataIfEmpty();
   const existing = readStoredTenders();
   const closedTenders: AdminTender[] = [];
   const closingSoonTenders: AdminTender[] = [];
@@ -200,68 +201,20 @@ export function generateTenderId(): string {
   return `TENDER-${Date.now()}`;
 }
 
-// ── Seed mock → localStorage ─────────────────────────────────────────────────
-
-function parseVndValue(value: string): number {
-  // "2.400.000.000 ₫" → 2400000000
-  const cleaned = value.replace(/[^\d]/g, "");
-  return cleaned ? parseInt(cleaned, 10) : 0;
-}
-
-function mockTenderToAdminTender(t: (typeof MOCK_TENDERS)[number]): AdminTender {
-  const statusMap: Record<string, AdminTenderStatus> = {
-    "Đang mở":      "Đang mở",
-    "Sắp đóng":     "Sắp đóng",
-    "Đã đóng":      "Đã đóng",
-    "Đã có kết quả": "Đã có kết quả",
-  };
-  return {
-    id: t.id,
-    code: t.code,
-    title: t.name,
-    category: t.category as AdminTenderCategory,
-    status: statusMap[t.status] ?? "Đang mở",
-    deadline: toDateInputValue(t.deadline),
-    estimatedValue: parseVndValue(t.value),
-    description: t.description || "",
-    deliveryLocation: t.commercialTerms?.deliveryLocation || "",
-    deliveryTime: t.commercialTerms?.deliveryTime || "",
-    paymentTerms: t.commercialTerms?.paymentTerms || "",
-    documentRequirements: t.commercialTerms?.quotationRequirements ?? [],
-    items: (t.items || []).map((item, i) => ({
-      id: `item-${t.id}-${i}`,
-      materialId: undefined,
-      materialCode: undefined,
-      itemName: item.name,
-      specification: item.spec || "",
-      quantity: item.quantity || 0,
-      unit: item.unit || "",
-      note: item.note || "",
-    })),
-    createdAt: "2025-01-01T00:00:00.000Z",
-  };
-}
-
 /**
- * Seed dữ liệu mock vào localStorage nếu chưa có.
- * Chỉ chạy một lần — không ghi đè nếu đã có data.
+ * Seed dữ liệu demo vào localStorage nếu browser chưa có dữ liệu ProcureHub.
+ * Không ghi đè dữ liệu đã có.
  */
 export function ensureTenderSeedData(): void {
-  if (typeof window === "undefined") return;
-  const existing = getTenders();
-  if (existing.length > 0) return;
-  const seeded = MOCK_TENDERS.map(mockTenderToAdminTender);
-  writeStoredTenders(seeded);
+  initDemoDataIfEmpty();
 }
 
 /**
- * Xóa toàn bộ tender data rồi seed lại từ đầu.
+ * Xóa dữ liệu demo chính rồi seed lại từ đầu.
  * Chỉ dùng trong dev/test — không gọi khi production.
  */
 export function resetTenderSeedData(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(KEY);
-  ensureTenderSeedData();
+  resetDemoData();
 }
 
 // ── Chuyển đổi AdminTender → Tender (public shape) ──────────────────────────

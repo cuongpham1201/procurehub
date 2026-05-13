@@ -1,9 +1,11 @@
 import type { SupplierBid, BidStatus } from "@/types/supplierBid";
+import { initDemoDataIfEmpty } from "@/services/demoDataStorage";
 
 const BIDS_KEY = "procurehub_supplier_bids";
 
 export function getBids(): SupplierBid[] {
   if (typeof window === "undefined") return [];
+  initDemoDataIfEmpty();
   try {
     const raw = localStorage.getItem(BIDS_KEY);
     return raw ? (JSON.parse(raw) as SupplierBid[]) : [];

@@ -1,9 +1,11 @@
 import type { Supplier } from "@/types/supplier";
+import { initDemoDataIfEmpty } from "@/services/demoDataStorage";
 
 const STORAGE_KEY = "procurehub_suppliers";
 
 export function getSuppliers(): Supplier[] {
   if (typeof window === "undefined") return [];
+  initDemoDataIfEmpty();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as Supplier[]) : [];

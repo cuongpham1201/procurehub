@@ -1,4 +1,5 @@
 import type { SupplierAccount } from "@/types/supplierAccount";
+import { initDemoDataIfEmpty } from "@/services/demoDataStorage";
 
 const ACCOUNTS_KEY = "procurehub_supplier_accounts";
 const SESSION_KEY = "procurehub_current_supplier";
@@ -18,6 +19,7 @@ function readStoredArrayLength(key: string): number {
 
 export function getAccounts(): SupplierAccount[] {
   if (typeof window === "undefined") return [];
+  initDemoDataIfEmpty();
   try {
     const raw = localStorage.getItem(ACCOUNTS_KEY);
     return raw ? (JSON.parse(raw) as SupplierAccount[]) : [];
