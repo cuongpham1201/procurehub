@@ -11,7 +11,6 @@ import {
   getMaterialItems,
   getPurchaseCategories,
 } from "@/services/categoryStorage";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
 import { formatDisplayDate, getTodayDateString, isDateTodayOrFuture, toDateInputValue } from "@/services/dateUtils";
 import QuickMaterialModal from "@/components/admin/QuickMaterialModal";
 import type { AdminTender, AdminTenderCategory, AdminTenderStatus } from "@/types/adminTender";
@@ -203,15 +202,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setTender({ ...tender, status: newStatus });
     setSuccessMsg("Đã cập nhật trạng thái gói thầu.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    await addAdminActivityLog({
-      type: "tender_status",
-      title: "Cập nhật trạng thái gói thầu",
-      description: `${tender.code} chuyển từ ${oldStatus} sang ${newStatus}`,
-      entityType: "tender",
-      entityId: tender.id,
-      entityCode: tender.code,
-      ...actorFromSession(getInternalSession()),
-    });
+    void oldStatus;
   }
 
   function openReopenForm() {
@@ -242,15 +233,6 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setReopenError("");
     setSuccessMsg("Đã mở thầu lại gói thầu.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    await addAdminActivityLog({
-      type: "tender_status",
-      title: "Mở thầu lại",
-      description: `${tender.code} được mở lại với hạn nộp mới ${formatDisplayDate(normalizedDeadline)}`,
-      entityType: "tender",
-      entityId: tender.id,
-      entityCode: tender.code,
-      ...actorFromSession(getInternalSession()),
-    });
   }
 
   async function handleDeleteTender() {
@@ -262,15 +244,6 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     if (!window.confirm(message)) return;
 
     await deleteTender(tender.id);
-    await addAdminActivityLog({
-      type: "system",
-      title: "Đã xóa gói thầu",
-      description: `Xóa ${tender.code} – ${tender.title} khỏi dữ liệu test`,
-      entityType: "tender",
-      entityId: tender.id,
-      entityCode: tender.code,
-      ...actorFromSession(getInternalSession()),
-    });
     router.push("/admin/tenders");
   }
 
@@ -985,7 +958,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
               {tender.status === "Đã đóng" && bids.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
                   <p className="font-semibold mb-0.5">Gói thầu đã đóng – {bids.length} báo giá</p>
-                  <p>Chuyển sang "Đang đánh giá" để so sánh báo giá và chốt nhà cung cấp.</p>
+                  <p>Chuyển sang &quot;Đang đánh giá&quot; để so sánh báo giá và chốt nhà cung cấp.</p>
                 </div>
               )}
             </>

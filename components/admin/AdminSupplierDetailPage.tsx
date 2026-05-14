@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAccounts, updateAccount } from "@/services/supplierAccountStorage";
-import { normalizePhone, isEmailExists, isTaxCodeExists, isPhoneExists } from "@/services/supplierAccountStorage";
+import { normalizePhone } from "@/services/supplierAccountStorage";
 import { getBids } from "@/services/supplierBidStorage";
 import { getInternalSession } from "@/services/authStorage";
 import { getCurrentSession, setCurrentSession } from "@/services/supplierAccountStorage";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { SupplierBid } from "@/types/supplierBid";
 
@@ -169,15 +168,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
     setAccount(updated);
     setSuccessMsg("Đã cập nhật trạng thái nhà cung cấp.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    await addAdminActivityLog({
-      type: "supplier_profile",
-      title: "Cập nhật hồ sơ nhà cung cấp",
-      description: `${account.companyName} chuyển từ "${oldStatus}" sang "${newStatus}"`,
-      entityType: "supplier",
-      entityId: account.id,
-      entityCode: shortId(account.id),
-      ...actorFromSession(getInternalSession()),
-    });
+    void oldStatus;
   }
 
   function startEdit() {

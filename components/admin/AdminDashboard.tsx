@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { SupplierAccount } from "@/types/supplierAccount";
-import type { SupplierBid } from "@/types/supplierBid";
 import type { AdminTender } from "@/types/adminTender";
 import { getAdminActivityLogs } from "@/services/activityStorage";
-import type { ActivityLogType, AdminActivityLog } from "@/services/activityStorage";
 import { getAccounts } from "@/services/supplierAccountStorage";
 import { getBids } from "@/services/supplierBidStorage";
 import { getTenders } from "@/services/tenderStorage";
+import {
+  ACTIVITY_ACTION_LABELS,
+  ACTIVITY_ENTITY_LABELS,
+} from "@/types/activityLog";
+import type { ActivityEntityType, ActivityLog } from "@/types/activityLog";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -188,19 +191,19 @@ function urgencyClass(urgency: TaskItem["urgency"]) {
   return "bg-slate-100 text-slate-600 border border-slate-200";
 }
 
-function logTypeToItemType(t: ActivityLogType): ActivityItem["type"] {
-  if (t === "supplier_profile") return "supplier";
-  if (t === "bid_status" || t === "bid_deleted") return "bid";
+function entityTypeToItemType(entityType: ActivityEntityType): ActivityItem["type"] {
+  if (entityType === "supplier") return "supplier";
+  if (entityType === "bid") return "bid";
   return "tender";
 }
 
-function logToActivityItem(log: AdminActivityLog): ActivityItem {
+function logToActivityItem(log: ActivityLog): ActivityItem {
   return {
     id: log.id,
-    type: logTypeToItemType(log.type),
-    title: log.title,
+    type: entityTypeToItemType(log.entityType),
+    title: `${ACTIVITY_ACTION_LABELS[log.action]} ${ACTIVITY_ENTITY_LABELS[log.entityType]}`,
     description: log.description,
-    actor: [log.actorName, log.actorRole].filter(Boolean).join(" · ") || undefined,
+    actor: [log.actorName, log.actorEmail].filter(Boolean).join(" · ") || undefined,
     time: formatActivityTime(log.createdAt),
   };
 }

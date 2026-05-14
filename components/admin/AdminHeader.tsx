@@ -17,6 +17,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/bids": "Báo giá",
   "/admin/bid-comparison": "So sánh báo giá",
   "/admin/users": "Quản lý người dùng",
+  "/admin/activity-logs": "Activity Log",
 };
 
 function getPageTitle(pathname: string): string {
@@ -35,8 +36,11 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    setUser(getInternalSession());
-    setChecked(true);
+    const timer = window.setTimeout(() => {
+      setUser(getInternalSession());
+      setChecked(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function handleLogout() {

@@ -9,8 +9,6 @@ import {
   updateAdminTenderStatus,
 } from "@/services/tenderStorage";
 import { getBids, markBidAsWinner } from "@/services/supplierBidStorage";
-import { getInternalSession } from "@/services/authStorage";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
 import { formatDisplayDate } from "@/services/dateUtils";
 import type { AdminTender } from "@/types/adminTender";
 import type { SupplierBid } from "@/types/supplierBid";
@@ -37,10 +35,6 @@ function getBidDate(b: SupplierBid): string {
 
 function getBidCode(b: SupplierBid): string {
   return b.bidCode ?? b.id;
-}
-
-function getBidTitle(b: SupplierBid): string {
-  return b.tenderTitle ?? b.tenderName ?? "—";
 }
 
 // ── status colours ─────────────────────────────────────────────────────────
@@ -184,18 +178,8 @@ export default function AdminBidComparisonPage() {
 
   // ── handlers ─────────────────────────────────────────────────────────────
   async function handleSelectWinner(bidId: string) {
-    const winnerBid = allBids.find((b) => b.id === bidId);
     await markBidAsWinner(bidId, selectedTenderId);
     await updateAdminTenderStatus(selectedTenderId, "Đã có kết quả");
-    await addAdminActivityLog({
-      type: "winner_selected",
-      title: "Đã chốt kết quả gói thầu",
-      description: `Chọn ${winnerBid?.supplierName ?? "—"} cho gói ${selectedTender?.code ?? ""} – ${selectedTender?.title ?? ""}`,
-      entityType: "tender",
-      entityId: selectedTenderId,
-      entityCode: selectedTender?.code,
-      ...actorFromSession(getInternalSession()),
-    });
     const [freshBids, freshTenders] = await Promise.all([getBids(), getTenders()]);
     setAllBids(freshBids);
     setAllTenders(freshTenders);
@@ -286,7 +270,7 @@ export default function AdminBidComparisonPage() {
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-blue-500 mt-1.5">Chuyển gói thầu sang "Đang đánh giá" để bắt đầu so sánh.</p>
+            <p className="text-xs text-blue-500 mt-1.5">Chuyển gói thầu sang &quot;Đang đánh giá&quot; để bắt đầu so sánh.</p>
           </div>
         )}
         {tendersWithBids.length > 0 && filteredTenders.length === 0 && (
@@ -546,7 +530,7 @@ export default function AdminBidComparisonPage() {
                     </span>{" "}
                     cho gói thầu{" "}
                     <span className="font-semibold">{selectedTender.code}</span>?{" "}
-                    Các báo giá còn lại sẽ chuyển sang "Không được chọn" và gói thầu sẽ cập nhật thành "Đã có kết quả".
+                    Các báo giá còn lại sẽ chuyển sang &quot;Không được chọn&quot; và gói thầu sẽ cập nhật thành &quot;Đã có kết quả&quot;.
                   </div>
                 )}
               </Section>

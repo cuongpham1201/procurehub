@@ -1,6 +1,11 @@
 import { query, withTransaction } from "@/lib/db";
-import type { AdminActivityLog } from "@/services/activityStorage";
 import type { AdminTender } from "@/types/adminTender";
+import type {
+  ActivityLog,
+  ActivityLogFilters,
+  ActivityLogListResponse,
+  ActivityPayload,
+} from "@/types/activityLog";
 import type { MaterialItem, PurchaseCategory } from "@/types/category";
 import type { InternalUser } from "@/types/internalUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
@@ -104,6 +109,11 @@ function asNumber(value: string | number | null | undefined): number {
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asObject(value: unknown): ActivityPayload | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as ActivityPayload;
 }
 
 function tenderItemFromRow(row: TenderItemRow) {
@@ -535,6 +545,11 @@ export async function upsertInternalUser(user: InternalUser): Promise<InternalUs
   return user;
 }
 
+export async function getInternalUser(id: string): Promise<InternalUser | null> {
+  const users = await listInternalUsers();
+  return users.find((user) => user.id === id) ?? null;
+}
+
 export async function listCategories(): Promise<PurchaseCategory[]> {
   const result = await query<{
     id: string;
@@ -613,6 +628,11 @@ export async function listMaterials(): Promise<MaterialItem[]> {
   }));
 }
 
+export async function getMaterial(id: string): Promise<MaterialItem | null> {
+  const materials = await listMaterials();
+  return materials.find((material) => material.id === id) ?? null;
+}
+
 export async function upsertMaterial(material: MaterialItem): Promise<MaterialItem> {
   await query(
     `insert into material_items (
@@ -647,54 +667,141 @@ export async function upsertMaterial(material: MaterialItem): Promise<MaterialIt
   return material;
 }
 
-export async function listActivityLogs(): Promise<AdminActivityLog[]> {
+export async function listActivityLogs(
+  filters: ActivityLogFilters = {},
+): Promise<ActivityLogListResponse> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let index = 1;
+
+  if (filters.entityType) {
+    conditions.push(`entity_type = $${index++}`);
+    params.push(filters.entityType);
+  }
+
+  if (filters.action) {
+    conditions.push(`action = $${index++}`);
+    params.push(filters.action);
+  }
+
+  if (filters.fromDate) {
+    conditions.push(`created_at >= $${index++}::date`);
+    params.push(filters.fromDate);
+  }
+
+  if (filters.toDate) {
+    conditions.push(`created_at < ($${index++}::date + interval '1 day')`);
+    params.push(filters.toDate);
+  }
+
+  if (filters.search?.trim()) {
+    conditions.push(
+      `(coalesce(actor_name, '') ilike $${index}
+        or coalesce(actor_email, '') ilike $${index}
+        or coalesce(entity_name, '') ilike $${index}
+        or coalesce(entity_id, '') ilike $${index}
+        or coalesce(description, '') ilike $${index})`,
+    );
+    params.push(`%${filters.search.trim()}%`);
+    index += 1;
+  }
+
+  const whereClause = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";
+  const rawLimit = Number.isFinite(filters.limit) ? Number(filters.limit) : 50;
+  const rawOffset = Number.isFinite(filters.offset) ? Number(filters.offset) : 0;
+  const limit = Math.max(1, Math.min(rawLimit, 100));
+  const offset = Math.max(0, rawOffset);
+
+  const totalResult = await query<{ total: string }>(
+    `select count(*)::text as total from activity_logs ${whereClause}`,
+    params,
+  );
+
   const result = await query<{
     id: string;
-    type: string | null;
-    title: string;
-    description: string | null;
-    entity_type: string | null;
-    entity_id: string | null;
-    entity_code: string | null;
+    entity_type: string;
+    entity_id: string;
+    entity_name: string | null;
+    action: string;
+    actor_id: string | null;
+    actor_type: string | null;
     actor_name: string | null;
-    actor_role: string | null;
+    actor_email: string | null;
+    description: string;
+    metadata: unknown;
+    old_values: unknown;
+    new_values: unknown;
     created_at: string | Date | null;
-    raw_data: JsonRecord;
-  }>("select * from audit_events order by created_at desc limit 100");
-  return result.rows.map((row) => ({
-    ...(row.raw_data as Partial<AdminActivityLog>),
-    id: row.id,
-    type: (row.type ?? "system") as AdminActivityLog["type"],
-    title: row.title,
-    description: row.description ?? undefined,
-    entityType: row.entity_type as AdminActivityLog["entityType"],
-    entityId: row.entity_id ?? undefined,
-    entityCode: row.entity_code ?? undefined,
-    actorName: row.actor_name ?? undefined,
-    actorRole: row.actor_role ?? undefined,
-    createdAt: asIso(row.created_at),
-  }));
+  }>(
+    `select *
+    from activity_logs
+    ${whereClause}
+    order by created_at desc
+    limit $${index++}
+    offset $${index++}`,
+    [...params, limit, offset],
+  );
+
+  return {
+    items: result.rows.map((row) => ({
+      id: row.id,
+      entityType: row.entity_type as ActivityLog["entityType"],
+      entityId: row.entity_id,
+      entityName: row.entity_name ?? undefined,
+      action: row.action as ActivityLog["action"],
+      actorId: row.actor_id ?? undefined,
+      actorType: row.actor_type as ActivityLog["actorType"] | undefined,
+      actorName: row.actor_name ?? undefined,
+      actorEmail: row.actor_email ?? undefined,
+      description: row.description,
+      metadata: asObject(row.metadata),
+      oldValues: asObject(row.old_values),
+      newValues: asObject(row.new_values),
+      createdAt: asIso(row.created_at),
+    })),
+    total: Number(totalResult.rows[0]?.total ?? 0),
+    limit,
+    offset,
+  };
 }
 
-export async function createActivityLog(log: AdminActivityLog): Promise<AdminActivityLog> {
+export async function createActivityLog(log: ActivityLog): Promise<ActivityLog> {
   await query(
-    `insert into audit_events (
-      id, type, title, description, entity_type, entity_id, entity_code,
-      actor_name, actor_role, created_at, raw_data
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
-    on conflict (id) do update set raw_data = excluded.raw_data`,
+    `insert into activity_logs (
+      id, entity_type, entity_id, entity_name, action, actor_id, actor_type,
+      actor_name, actor_email, description, metadata, old_values, new_values, created_at
+    ) values (
+      $1, $2, $3, $4, $5, $6, $7,
+      $8, $9, $10, $11::jsonb, $12::jsonb, $13::jsonb, $14
+    )
+    on conflict (id) do update set
+      entity_type = excluded.entity_type,
+      entity_id = excluded.entity_id,
+      entity_name = excluded.entity_name,
+      action = excluded.action,
+      actor_id = excluded.actor_id,
+      actor_type = excluded.actor_type,
+      actor_name = excluded.actor_name,
+      actor_email = excluded.actor_email,
+      description = excluded.description,
+      metadata = excluded.metadata,
+      old_values = excluded.old_values,
+      new_values = excluded.new_values`,
     [
       log.id,
-      log.type,
-      log.title,
-      log.description ?? null,
-      log.entityType ?? null,
-      log.entityId ?? null,
-      log.entityCode ?? null,
+      log.entityType,
+      log.entityId,
+      log.entityName ?? null,
+      log.action,
+      log.actorId ?? null,
+      log.actorType ?? null,
       log.actorName ?? null,
-      log.actorRole ?? null,
+      log.actorEmail ?? null,
+      log.description,
+      JSON.stringify(log.metadata ?? null),
+      JSON.stringify(log.oldValues ?? null),
+      JSON.stringify(log.newValues ?? null),
       log.createdAt,
-      JSON.stringify(log),
     ],
   );
   return log;

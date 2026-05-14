@@ -1,6 +1,4 @@
 import { apiGet, apiPost, apiPut } from "@/services/apiClient";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
-import { getInternalSession } from "@/services/authStorage";
 import type { CatalogStatus, MaterialItem, PurchaseCategory } from "@/types/category";
 
 type PurchaseCategoryInput = {
@@ -25,15 +23,6 @@ function normalizeCode(value: string): string {
   return value.trim().toUpperCase();
 }
 
-async function logCatalogChange(description: string): Promise<void> {
-  await addAdminActivityLog({
-    type: "system",
-    title: "Cập nhật danh mục mua sắm",
-    description,
-    ...actorFromSession(getInternalSession()),
-  });
-}
-
 export async function getPurchaseCategories(): Promise<PurchaseCategory[]> {
   try {
     return await apiGet<PurchaseCategory[]>("/api/procurement-groups");
@@ -53,7 +42,6 @@ export async function createPurchaseCategory(data: PurchaseCategoryInput): Promi
     createdAt: now,
   };
   const saved = await apiPost<PurchaseCategory>("/api/procurement-groups", category);
-  await logCatalogChange(`Thêm nhóm mua sắm ${saved.code} — ${saved.name}`);
   return saved;
 }
 
@@ -96,7 +84,6 @@ export async function updatePurchaseCategory(
     );
   }
 
-  await logCatalogChange(`Sửa nhóm mua sắm ${saved.code} — ${saved.name}`);
   return saved;
 }
 
@@ -137,9 +124,7 @@ export async function createMaterialItem(
     createdAt: now,
   };
   const saved = await apiPost<MaterialItem>("/api/material-items", item);
-  if (!options?.skipLog) {
-    await logCatalogChange(`Thêm mã vật tư ${saved.materialCode} — ${saved.materialName}`);
-  }
+  void options;
   return saved;
 }
 
@@ -164,7 +149,6 @@ export async function updateMaterialItem(
   };
 
   const saved = await apiPut<MaterialItem>(`/api/material-items/${encodeURIComponent(id)}`, updated);
-  await logCatalogChange(`Sửa mã vật tư ${saved.materialCode} — ${saved.materialName}`);
   return saved;
 }
 

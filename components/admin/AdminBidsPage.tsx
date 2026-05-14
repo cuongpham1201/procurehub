@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getBids, deleteBid } from "@/services/supplierBidStorage";
-import { getInternalSession } from "@/services/authStorage";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
 import type { SupplierBid, BidStatus } from "@/types/supplierBid";
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -124,18 +122,6 @@ export default function AdminBidsPage() {
   }, []);
 
   async function handleDelete(id: string) {
-    const target = bids.find((b) => b.id === id);
-    if (target) {
-      await addAdminActivityLog({
-        type: "bid_deleted",
-        title: "Đã xóa báo giá test",
-        description: `Xóa ${target.bidCode ?? target.id} của ${target.supplierName} – ${target.tenderCode}`,
-        entityType: "bid",
-        entityId: target.id,
-        entityCode: target.bidCode ?? target.id,
-        ...actorFromSession(getInternalSession()),
-      });
-    }
     await deleteBid(id);
     setBids(await getBids());
     setConfirmDeleteId(null);
@@ -205,8 +191,7 @@ export default function AdminBidsPage() {
             <div>
               <p className="text-sm font-semibold text-red-800">Xác nhận xóa báo giá?</p>
               <p className="text-xs text-red-600 mt-0.5">
-                {target ? `${target.bidCode ?? target.id} – ${target.supplierName}` : "Báo giá này"} sẽ bị xóa khỏi localStorage.
-                Thao tác này chỉ áp dụng cho dữ liệu test.
+                {target ? `${target.bidCode ?? target.id} – ${target.supplierName}` : "Báo giá này"} sẽ bị xóa khỏi hệ thống.
               </p>
             </div>
             <div className="flex gap-2 shrink-0">

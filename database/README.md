@@ -27,6 +27,7 @@ This creates the ProcureHub tables:
 - `material_items`
 - `internal_users`
 - `audit_events`
+- `activity_logs`
 
 IDs are stored as `text` so existing local IDs can be imported without remapping. Complex source payloads are preserved in each table's `raw_data jsonb` column.
 

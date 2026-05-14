@@ -1,59 +1,50 @@
 import { apiGet, apiPost } from "@/services/apiClient";
-import type { InternalUser } from "@/types/internalUser";
+import type {
+  ActivityLog,
+  ActivityLogFilters,
+  ActivityLogInput,
+  ActivityLogListResponse,
+} from "@/types/activityLog";
 
-const MAX_LOGS = 100;
+const DEFAULT_LIMIT = 50;
 
-export type ActivityLogType =
-  | "tender_status"
-  | "bid_status"
-  | "winner_selected"
-  | "supplier_profile"
-  | "bid_deleted"
-  | "system";
-
-export interface AdminActivityLog {
-  id: string;
-  type: ActivityLogType;
-  title: string;
-  description?: string;
-  entityType?: "tender" | "bid" | "supplier" | "material";
-  entityId?: string;
-  entityCode?: string;
-  actorName?: string;
-  actorRole?: string;
-  createdAt: string;
+function toQueryString(filters: ActivityLogFilters = {}): string {
+  const searchParams = new URLSearchParams();
+  if (filters.entityType) searchParams.set("entityType", filters.entityType);
+  if (filters.action) searchParams.set("action", filters.action);
+  if (filters.search) searchParams.set("search", filters.search);
+  if (filters.fromDate) searchParams.set("fromDate", filters.fromDate);
+  if (filters.toDate) searchParams.set("toDate", filters.toDate);
+  if (filters.limit) searchParams.set("limit", String(filters.limit));
+  if (filters.offset) searchParams.set("offset", String(filters.offset));
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : "";
 }
 
-export type AdminActivityLogInput = Omit<AdminActivityLog, "id" | "createdAt">;
-
-export async function getAdminActivityLogs(): Promise<AdminActivityLog[]> {
+export async function getActivityLogs(
+  filters: ActivityLogFilters = {},
+): Promise<ActivityLogListResponse> {
   try {
-    const logs = await apiGet<AdminActivityLog[]>("/api/activity-logs");
-    return logs.slice(0, MAX_LOGS);
+    return await apiGet<ActivityLogListResponse>(`/api/activity-logs${toQueryString(filters)}`);
   } catch {
-    return [];
+    return {
+      items: [],
+      total: 0,
+      limit: filters.limit ?? DEFAULT_LIMIT,
+      offset: filters.offset ?? 0,
+    };
   }
 }
 
-export async function addAdminActivityLog(input: AdminActivityLogInput): Promise<void> {
-  const log: AdminActivityLog = {
-    ...input,
-    id: `ACT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    createdAt: new Date().toISOString(),
-  };
-  await apiPost<AdminActivityLog>("/api/activity-logs", log).catch(() => undefined);
+export async function getAdminActivityLogs(limit = DEFAULT_LIMIT): Promise<ActivityLog[]> {
+  const response = await getActivityLogs({ limit });
+  return response.items;
+}
+
+export async function addAdminActivityLog(input: ActivityLogInput): Promise<void> {
+  await apiPost<ActivityLog>("/api/activity-logs", input).catch(() => undefined);
 }
 
 export async function clearAdminActivityLogs(): Promise<void> {
   // Not exposed by API yet; keeping the export for compatibility.
-}
-
-export function actorFromSession(
-  session: InternalUser | null,
-): { actorName?: string; actorRole?: string } {
-  if (!session) return {};
-  return {
-    actorName: session.fullName ?? session.name ?? undefined,
-    actorRole: session.role ?? undefined,
-  };
 }

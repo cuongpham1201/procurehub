@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getBidById, updateBidStatus, deleteBid } from "@/services/supplierBidStorage";
 import { getAccounts } from "@/services/supplierAccountStorage";
-import { getInternalSession } from "@/services/authStorage";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
 import type { SupplierBid, BidItem, BidStatus } from "@/types/supplierBid";
 import type { SupplierAccount } from "@/types/supplierAccount";
 
@@ -242,15 +240,6 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
     setBid((prev) => (prev ? { ...prev, status: newStatus } : prev));
     setSuccessMsg("Đã cập nhật trạng thái báo giá.");
     setTimeout(() => setSuccessMsg(""), 4000);
-    await addAdminActivityLog({
-      type: "bid_status",
-      title: "Cập nhật trạng thái báo giá",
-      description: `${bid.bidCode ?? bid.id} của ${bid.supplierName} chuyển sang ${newStatus}`,
-      entityType: "bid",
-      entityId: bid.id,
-      entityCode: bid.bidCode ?? bid.id,
-      ...actorFromSession(getInternalSession()),
-    });
   }
 
   if (loading) {

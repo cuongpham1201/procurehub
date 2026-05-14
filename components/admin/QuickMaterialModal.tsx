@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { createMaterialItem } from "@/services/categoryStorage";
-import { addAdminActivityLog, actorFromSession } from "@/services/activityStorage";
-import { getInternalSession } from "@/services/authStorage";
 import type { MaterialItem, PurchaseCategory } from "@/types/category";
 
 type QuickMaterialForm = {
@@ -87,16 +85,6 @@ export default function QuickMaterialModal({
       },
       { skipLog: true },
     );
-
-    await addAdminActivityLog({
-      type: "system",
-      title: "Thêm mã vật tư",
-      description: `Thêm nhanh ${material.materialCode} - ${material.materialName} khi tạo gói thầu`,
-      entityType: "material",
-      entityId: material.id,
-      entityCode: material.materialCode,
-      ...actorFromSession(getInternalSession()),
-    });
 
     onCreated(material);
   }

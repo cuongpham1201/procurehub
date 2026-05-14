@@ -1,5 +1,4 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/services/apiClient";
-import { addAdminActivityLog } from "@/services/activityStorage";
 import { getBids, deleteBid } from "@/services/supplierBidStorage";
 import {
   formatDisplayDate,
@@ -49,17 +48,6 @@ export async function syncExpiredTenders(): Promise<AdminTender[]> {
     };
     await saveAdminTender(updated);
     synced.push(updated);
-    await addAdminActivityLog({
-      type: "tender_status",
-      title: nextStatus === "Sắp đóng" ? "Tự động đánh dấu sắp đóng" : "Tự động đóng gói thầu",
-      description:
-        nextStatus === "Sắp đóng"
-          ? `${tender.code} còn không quá ${CLOSING_SOON_DAYS} ngày đến hạn nộp và được chuyển sang Sắp đóng`
-          : `${tender.code} đã quá hạn nộp và được chuyển sang Đã đóng`,
-      entityType: "tender",
-      entityId: tender.id,
-      entityCode: tender.code,
-    });
   }
 
   return synced;
