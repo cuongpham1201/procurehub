@@ -280,6 +280,80 @@ function buildLatestOpenTenders(tenders: AdminTender[]): Tender[] {
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
+const HERO_METRICS = [
+  {
+    value: "120+",
+    label: "Gói thầu mỗi năm",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#c9a227" }}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+    ),
+  },
+  {
+    value: "850+",
+    label: "Nhà cung cấp",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#c9a227" }}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
+  },
+  {
+    value: "100%",
+    label: "Quy trình minh bạch",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#c9a227" }}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
+  },
+  {
+    value: "5.000+",
+    label: "Tỷ ₫ giá trị mua sắm",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "#c9a227" }}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+];
+
+function HeroMetricsPanel({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-2xl px-7 py-5 grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-5 ${className}`}
+      style={{
+        background: "rgba(5,14,30,0.58)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        boxShadow: "0 4px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.07)",
+      }}
+    >
+      {HERO_METRICS.map((m) => (
+        <div key={m.label} className="flex items-center gap-3.5">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "rgba(201,162,39,0.14)" }}
+          >
+            {m.icon}
+          </div>
+          <div>
+            <div
+              className="text-[21px] font-bold leading-none tracking-tight tabular-nums"
+              style={{ color: "#c9a227" }}
+            >
+              {m.value}
+            </div>
+            <div className="text-white/55 text-[11.5px] mt-1 leading-tight">{m.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Hero({
   searchQuery,
   setSearchQuery,
@@ -291,76 +365,246 @@ function Hero({
 }) {
   return (
     <section
-      className="bg-[#0a1e3d] py-20 px-4"
-      style={{
-        backgroundImage:
-          "linear-gradient(135deg, #0a1e3d 0%, #0f2d5e 60%, #0d2550 100%)",
-      }}
+      className="relative overflow-hidden"
+      style={{ background: "#07152b", minHeight: 820 }}
     >
-      <div className="max-w-4xl mx-auto text-center">
-        {/* Tag nhỏ */}
-        <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs font-medium px-3 py-1 rounded-full mb-8">
-          <span className="w-2 h-2 bg-[#c9a227] rounded-full flex-shrink-0"></span>
-          Hệ thống đấu thầu nội bộ của Bia Hạ Long
+      {/* ── Background: pre-processed cinematic image — show at near full opacity ── */}
+      <div className="absolute inset-0 pointer-events-none select-none">
+        <Image
+          src="/images/cover nha may.png"
+          alt=""
+          fill
+          className="object-cover object-center"
+          style={{ opacity: 0.96 }}
+          priority
+        />
+      </div>
+
+      {/* ── Overlay 1: Minimal left reinforcement for text contrast ──────────── */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(100deg, rgba(6,16,36,0.55) 0%, rgba(6,16,36,0.38) 30%, rgba(6,16,36,0.08) 55%, transparent 72%)",
+        }}
+      />
+
+      {/* ── Overlay 2: Subtle bottom-to-top fade — smooth section transition ─── */}
+      <div
+        className="absolute inset-x-0 bottom-0 pointer-events-none"
+        style={{
+          height: "36%",
+          background: "linear-gradient(to top, rgba(6,16,36,0.85) 0%, rgba(6,16,36,0.22) 50%, transparent 100%)",
+        }}
+      />
+
+      {/* ── Gold accent line — top ────────────────────────────────────────────── */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none"
+        style={{
+          background: "linear-gradient(to right, #c9a227 0%, rgba(201,162,39,0.45) 38%, transparent 58%)",
+        }}
+      />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          MAIN CONTENT
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <div className="relative z-10 max-w-[1440px] mx-auto px-8 lg:px-[80px] xl:px-[112px]">
+        <div className="pt-28 lg:pt-36 pb-20 lg:pb-28">
+          <div className="max-w-[620px]">
+
+            {/* Badge */}
+            <div
+              className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8"
+              style={{
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: "#c9a227" }}
+              />
+              <span className="text-white/72 text-[12px] font-medium tracking-wide">
+                Hệ thống đấu thầu nội bộ của Bia Hạ Long
+              </span>
+            </div>
+
+            {/* Main heading */}
+            <h1
+              className="font-bold leading-[1.05] tracking-tight mb-6"
+              style={{ fontSize: "clamp(44px, 5.5vw, 66px)", letterSpacing: "-0.025em" }}
+            >
+              <span className="text-white block">Cổng đấu thầu</span>
+              <span className="text-white block">&amp; mua sắm</span>
+              <span style={{ color: "#c9a227" }}>Bia Hạ Long</span>
+            </h1>
+
+            {/* Description */}
+            <p className="text-white/72 text-[16px] lg:text-[17px] leading-relaxed mb-10 max-w-[540px]">
+              Minh bạch hóa quy trình mua sắm nguyên vật liệu, máy móc và dịch vụ —
+              kết nối Bia Hạ Long với các nhà cung cấp uy tín, đảm bảo
+              công bằng và hiệu quả.
+            </p>
+
+            {/* Search bar */}
+            <form
+              onSubmit={(e) => { e.preventDefault(); onSearch(); }}
+              className="mb-8"
+            >
+              <div
+                className="flex items-center rounded-xl overflow-hidden"
+                style={{
+                  background: "white",
+                  maxWidth: 580,
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.18), 0 1px 6px rgba(0,0,0,0.10)",
+                }}
+              >
+                <div className="pl-5 pr-2 text-slate-400 shrink-0">
+                  <IconSearch />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Tìm gói thầu theo tên, mã, nhóm hàng…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 py-[20px] px-2 text-[14px] text-slate-800 placeholder-slate-400 outline-none bg-transparent"
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 px-7 py-[20px] text-[14px] font-semibold transition-colors whitespace-nowrap"
+                  style={{ background: "#c9a227", color: "#0a1e3d" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#b8960c")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#c9a227")}
+                >
+                  Tìm kiếm
+                </button>
+              </div>
+            </form>
+
+            {/* CTA buttons */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/tenders"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+                style={{
+                  background: "#c9a227",
+                  color: "#0a1e3d",
+                  boxShadow: "0 4px 20px rgba(201,162,39,0.38)",
+                }}
+              >
+                Xem gói thầu đang mở
+                <IconChevronRight />
+              </Link>
+              <Link
+                href="/supplier/register-account"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white transition-all"
+                style={{
+                  background: "rgba(255,255,255,0.09)",
+                  border: "1px solid rgba(255,255,255,0.20)",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                Đăng ký nhà cung cấp
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+                style={{
+                  color: "rgba(255,255,255,0.60)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                }}
+              >
+                Đăng nhập
+              </Link>
+            </div>
+          </div>
         </div>
 
-        {/* Tiêu đề chính */}
-        <h1 className="text-4xl sm:text-5xl font-bold text-white mb-5 leading-tight">
-          Cổng đấu thầu &amp; mua sắm
-          <br className="hidden sm:block" />
-          <span className="text-[#c9a227]"> Bia Hạ Long</span>
-        </h1>
+        {/* ── Mobile metrics panel (in-flow) ───────────────────────────────────── */}
+        <div className="lg:hidden pb-10">
+          <HeroMetricsPanel />
+        </div>
+      </div>
 
-        {/* Mô tả */}
-        <p className="text-lg text-white/70 mb-10 max-w-2xl mx-auto leading-relaxed">
-          Minh bạch hóa quy trình mua sắm nguyên vật liệu, máy móc, thiết bị,
-          công cụ dụng cụ và dịch vụ — kết nối Bia Hạ Long với các nhà cung
-          cấp uy tín.
-        </p>
-
-        {/* Thanh tìm kiếm */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSearch();
-          }}
-          className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto mb-10"
-        >
-          <div className="flex-1 flex items-center bg-white rounded-lg px-4 gap-3 shadow-sm">
-            <span className="text-slate-400 flex-shrink-0">
-              <IconSearch />
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm gói thầu theo tên, mã, nhóm hàng..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 py-3.5 text-sm text-slate-800 placeholder-slate-400 outline-none bg-transparent"
-            />
+      {/* ── Desktop metrics panel: absolute bottom-right ─────────────────────── */}
+      <div className="hidden lg:block absolute bottom-0 inset-x-0 z-20 pointer-events-none">
+        <div className="max-w-[1440px] mx-auto px-[80px] xl:px-[112px] pb-10">
+          <div className="flex justify-end pointer-events-auto">
+            <HeroMetricsPanel className="w-[56%] xl:w-[52%]" />
           </div>
-          <button
-            type="submit"
-            className="bg-[#c9a227] hover:bg-[#b8960c] text-[#0f2d5e] font-semibold px-6 py-3.5 rounded-lg transition-colors whitespace-nowrap shadow-sm"
-          >
-            Tìm kiếm
-          </button>
-        </form>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* CTA */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            href="/tenders"
-            className="inline-flex items-center justify-center gap-2 bg-[#c9a227] text-[#0f2d5e] font-semibold px-6 py-3 rounded-lg hover:bg-[#b8960c] transition-colors shadow-sm"
-          >
-            Xem gói thầu đang mở
-            <IconChevronRight />
-          </Link>
-          <Link
-            href="/supplier/register-account"
-            className="inline-flex items-center justify-center gap-2 border border-white/30 text-white font-semibold px-6 py-3 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            Đăng ký nhà cung cấp
-          </Link>
+// ─── Feature strip — sits directly below the hero ────────────────────────────
+
+function FeatureStrip() {
+  const features = [
+    {
+      title: "Minh bạch & công bằng",
+      desc: "Mọi gói thầu đều được công bố công khai, quy trình xét duyệt nhất quán và có lưu vết.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      ),
+    },
+    {
+      title: "Quản lý tập trung",
+      desc: "Toàn bộ gói thầu, nhà cung cấp, báo giá và lịch sử giao dịch trên một nền tảng duy nhất.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+      ),
+    },
+    {
+      title: "So sánh & đánh giá",
+      desc: "So sánh báo giá nhiều nhà cung cấp trực quan, hỗ trợ quyết định mua sắm tối ưu chi phí.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+    },
+    {
+      title: "Bảo mật dữ liệu",
+      desc: "Hệ thống nội bộ, phân quyền chặt chẽ. Chỉ nhà cung cấp được duyệt mới có thể truy cập thầu.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <section className="bg-white border-b border-slate-100">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 xl:px-16 py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1">
+          {features.map((f, i) => (
+            <div
+              key={f.title}
+              className={`flex items-start gap-4 px-5 py-6 rounded-xl transition-colors hover:bg-slate-50 ${
+                i < features.length - 1 ? "lg:border-r lg:border-slate-100" : ""
+              }`}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-[#0f2d5e]"
+                style={{ background: "rgba(201,162,39,0.10)" }}
+              >
+                {f.icon}
+              </div>
+              <div>
+                <p className="text-[13.5px] font-semibold text-slate-800 mb-1">{f.title}</p>
+                <p className="text-[12px] text-slate-500 leading-relaxed">{f.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -755,6 +999,7 @@ export default function LandingPage() {
     <div className="bg-white">
       <PublicHeader />
       <Hero searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSearch={handleSearch} />
+      <FeatureStrip />
       <LatestTenders latestSix={latestTenders} />
       <Categories categories={categoryStats} />
       <Process />

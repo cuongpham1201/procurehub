@@ -1,85 +1,53 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  FileText,
+  Package,
+  Building2,
+  DollarSign,
+  BarChart2,
+  Users,
+  Clock,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-react";
 
 interface AdminSidebarProps {
   open: boolean;
   onClose: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-const NAV_ITEMS = [
+const NAV_GROUPS = [
   {
-    label: "Tổng quan",
-    href: "/admin",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-      </svg>
-    ),
+    label: "Menu",
+    items: [
+      { label: "Tổng quan",    href: "/admin",                 icon: LayoutDashboard },
+      { label: "Gói thầu",     href: "/admin/tenders",         icon: FileText },
+    ],
   },
   {
-    label: "Gói thầu",
-    href: "/admin/tenders",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
+    label: "Quản lý",
+    items: [
+      { label: "Nhà cung cấp",    href: "/admin/suppliers",       icon: Building2 },
+      { label: "Báo giá",         href: "/admin/bids",            icon: DollarSign },
+      { label: "So sánh báo giá", href: "/admin/bid-comparison",  icon: BarChart2 },
+    ],
   },
   {
-    label: "Nhóm mua sắm",
-    href: "/admin/categories",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7.5 12 3 4 7.5m16 0-8 4.5m8-4.5v9L12 21m0-9L4 7.5m8 4.5v9M4 7.5v9L12 21" />
-      </svg>
-    ),
-  },
-  {
-    label: "Nhà cung cấp",
-    href: "/admin/suppliers",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-  },
-  {
-    label: "Báo giá",
-    href: "/admin/bids",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    label: "So sánh báo giá",
-    href: "/admin/bid-comparison",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Quản lý người dùng",
-    href: "/admin/users",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Activity Log",
-    href: "/admin/activity-logs",
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9m-6-4 4 4m0 0-4 4m4-4H9" />
-      </svg>
-    ),
+    label: "Hệ thống",
+    items: [
+      { label: "Người dùng",    href: "/admin/users",           icon: Users },
+      { label: "Nhóm mua sắm", href: "/admin/categories",      icon: Package },
+      { label: "Activity Log",  href: "/admin/activity-logs",   icon: Clock },
+    ],
   },
 ];
 
@@ -88,87 +56,161 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
+export default function AdminSidebar({
+  open,
+  onClose,
+  collapsed,
+  onToggleCollapse,
+}: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
     <aside
+      style={{ background: "var(--sidebar-bg)" }}
       className={[
-        "fixed inset-y-0 left-0 z-30 w-64 bg-[#0f2d5e] flex flex-col",
-        "transition-transform duration-200",
+        "fixed inset-y-0 left-0 z-30 flex flex-col",
+        "transition-[width,transform] duration-200 ease-in-out",
+        "border-r border-white/5",
+        /* mobile: slide in/out */
         open ? "translate-x-0" : "-translate-x-full",
         "lg:translate-x-0",
+        /* desktop: width toggle */
+        collapsed ? "w-16" : "w-60",
       ].join(" ")}
     >
-      {/* Branding */}
-      <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
-        <div>
-          <div className="text-white font-bold text-base leading-tight">
-            Bia Hạ Long
+      {/* ── Branding ─────────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-3 border-b h-14 shrink-0"
+        style={{ borderColor: "var(--sidebar-border)" }}
+      >
+        {collapsed ? (
+          <div className="mx-auto w-8 h-8 rounded-lg bg-[var(--brand-accent)] flex items-center justify-center">
+            <span className="text-[var(--brand-primary)] text-xs font-black leading-none">BHL</span>
           </div>
-          <div className="text-[#c9a227] text-xs font-medium mt-0.5">
-            Procurement Admin
+        ) : (
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="relative w-[120px] h-[36px] shrink-0">
+              <Image
+                src="/images/logo_ngang_biahalong.png"
+                alt="Bia Hạ Long"
+                fill
+                className="object-contain object-left"
+                style={{ filter: "brightness(0) invert(1)" }}
+                priority
+              />
+            </div>
+            <div
+              className="text-[10.5px] font-medium leading-tight truncate"
+              style={{ color: "var(--sidebar-text-secondary)" }}
+            >
+              Procurement Admin
+            </div>
           </div>
-        </div>
-        {/* Close button (mobile only) */}
+        )}
+
+        {/* Close button – mobile only */}
         <button
           onClick={onClose}
-          className="lg:hidden text-white/60 hover:text-white p-1 rounded"
+          className="lg:hidden p-1 rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors shrink-0"
           aria-label="Đóng menu"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-0.5 px-3">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item.href, pathname);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={onClose}
-                  className={[
-                    "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                    active
-                      ? "bg-[#c9a227] text-[#0f2d5e]"
-                      : "text-white/75 hover:text-white hover:bg-white/10",
-                  ].join(" ")}
-                >
-                  <span className={active ? "text-[#0f2d5e]" : "text-white/60"}>
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      {/* ── Navigation ───────────────────────────────────────────────────── */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-4">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            {/* Section label – visible only when expanded */}
+            {!collapsed && (
+              <div
+                className="px-2 mb-1 text-[10.5px] font-semibold uppercase tracking-widest"
+                style={{ color: "var(--sidebar-section-text)" }}
+              >
+                {group.label}
+              </div>
+            )}
+
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = isActive(item.href, pathname);
+                const Icon = item.icon;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onClose}
+                      title={collapsed ? item.label : undefined}
+                      className={[
+                        "sidebar-item",
+                        collapsed ? "justify-center px-0 py-2" : "",
+                        active ? "sidebar-item--active" : "",
+                      ].join(" ")}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" strokeWidth={active ? 2.5 : 1.8} />
+                      {!collapsed && (
+                        <span className="truncate">{item.label}</span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
 
         {/* Divider */}
-        <div className="mx-3 my-4 border-t border-white/10" />
+        <div
+          className="border-t mx-1"
+          style={{ borderColor: "var(--sidebar-border)" }}
+        />
 
-        {/* Back to public site */}
-        <div className="px-3">
-          <Link
-            href="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            Về trang public
-          </Link>
-        </div>
+        {/* Back to public */}
+        <Link
+          href="/"
+          title={collapsed ? "Về trang public" : undefined}
+          className={[
+            "sidebar-item text-white/50 hover:text-white/80",
+            collapsed ? "justify-center px-0 py-2" : "",
+          ].join(" ")}
+        >
+          <ExternalLink className="w-4 h-4 shrink-0" strokeWidth={1.8} />
+          {!collapsed && <span className="truncate">Về trang chủ</span>}
+        </Link>
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/10">
-        <div className="text-white/40 text-xs">ProcureHub v0.1 · MVP</div>
+      {/* ── Footer: collapse toggle ───────────────────────────────────────── */}
+      <div
+        className="px-2 py-3 border-t shrink-0"
+        style={{ borderColor: "var(--sidebar-border)" }}
+      >
+        <button
+          onClick={onToggleCollapse}
+          title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+          className={[
+            "sidebar-item w-full text-white/50 hover:text-white/80",
+            collapsed ? "justify-center px-0 py-2" : "justify-between",
+          ].join(" ")}
+        >
+          {!collapsed && (
+            <span className="text-[12px]">Thu gọn menu</span>
+          )}
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={1.8} />
+          ) : (
+            <ChevronLeft className="w-4 h-4 shrink-0" strokeWidth={1.8} />
+          )}
+        </button>
+
+        {!collapsed && (
+          <div
+            className="mt-2 px-2 text-[10.5px]"
+            style={{ color: "var(--sidebar-section-text)" }}
+          >
+            ProcureHub · MVP v0.1
+          </div>
+        )}
       </div>
     </aside>
   );
