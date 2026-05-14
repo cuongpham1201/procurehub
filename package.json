@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "psql \"$DATABASE_URL\" -f database/migrations/001_init_procurehub.sql",
-    "db:import-local": "node scripts/import-localstorage-to-postgres.mjs"
+    "db:import-local": "node scripts/import-localstorage-to-postgres.mjs",
+    "seed:demo": "node scripts/seed-demo-data.mjs"
   },
   "dependencies": {
     "next": "16.2.6",

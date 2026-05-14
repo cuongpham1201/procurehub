@@ -204,6 +204,20 @@ function getCategoryIcon(name: string) {
       return <IconWrench />;
     case "Dịch vụ phụ trợ":
       return <IconUsers />;
+    case "Pallet và vật tư kho":
+      return <IconBox />;
+    case "Logistics và vận tải":
+      return <IconUsers />;
+    case "Đồng phục và bảo hộ lao động":
+      return <IconUsers />;
+    case "Bảo trì và nâng hạ":
+      return <IconWrench />;
+    case "Thiết bị CNTT":
+      return <IconMonitor />;
+    case "Nguyên vật liệu đóng gói":
+      return <IconBox />;
+    case "Dịch vụ vệ sinh và phụ trợ":
+      return <IconUsers />;
     default:
       return <IconBox />;
   }
@@ -232,11 +246,23 @@ function parseDateTime(value: string): number {
   return isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
 }
 
+function normalizeCategoryKey(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^demo-\s*/i, "");
+}
+
 function buildCategories(tenders: AdminTender[], categories: PurchaseCategory[]): CategorySummary[] {
   return categories.map((category) => ({
     code: category.code,
     name: category.name,
-    count: tenders.filter((t) => t.category === category.name || t.category === category.code).length,
+    count: tenders.filter((t) => {
+      const tenderCategory = normalizeCategoryKey(t.category);
+      const categoryName = normalizeCategoryKey(category.name);
+      const categoryCode = normalizeCategoryKey(category.code);
+      return tenderCategory !== "" && (tenderCategory === categoryName || tenderCategory === categoryCode);
+    }).length,
   }));
 }
 

@@ -3,6 +3,7 @@ import type { InternalUser } from "@/types/internalUser";
 
 const INTERNAL_SESSION_KEY = "procurehub_current_internal_user";
 const SUPPLIER_SESSION_KEY = "procurehub_current_supplier";
+export const INTERNAL_DEFAULT_PASSWORD = "123456";
 
 export const MOCK_ADMIN: InternalUser = {
   id: "internal-admin-001",
@@ -36,14 +37,57 @@ export async function findInternalByCredentials(
   password: string,
 ): Promise<InternalUser | null> {
   const normalized = email.trim().toLowerCase();
-  const found = (await getAdminUsers()).find(
+  const users = await getAdminUsers();
+  const found = users.find(
     (u) => u.email.trim().toLowerCase() === normalized && u.password === password,
   );
   if (found) return found;
-  if (normalized === MOCK_ADMIN.email && password === MOCK_ADMIN.password) {
+  const hasPersistedAdmin = users.some(
+    (u) => u.email.trim().toLowerCase() === MOCK_ADMIN.email,
+  );
+  if (!hasPersistedAdmin && normalized === MOCK_ADMIN.email && password === MOCK_ADMIN.password) {
     return { ...MOCK_ADMIN, password: "" };
   }
   return null;
+}
+
+export async function resetAllInternalPasswords(
+  nextPassword: string = INTERNAL_DEFAULT_PASSWORD,
+): Promise<number> {
+  const users = await getAdminUsers();
+  const hasPersistedAdmin = users.some(
+    (u) => u.email.trim().toLowerCase() === MOCK_ADMIN.email,
+  );
+  const targets = hasPersistedAdmin
+    ? users
+    : [
+        {
+          ...MOCK_ADMIN,
+          password: nextPassword,
+        },
+        ...users,
+      ];
+
+  await Promise.all(
+    targets.map((user) =>
+      saveAdminUser({
+        ...user,
+        password: nextPassword,
+      }),
+    ),
+  );
+
+  return targets.length;
+}
+
+export async function resetInternalPassword(
+  user: InternalUser,
+  nextPassword: string = INTERNAL_DEFAULT_PASSWORD,
+): Promise<void> {
+  await saveAdminUser({
+    ...user,
+    password: nextPassword,
+  });
 }
 
 export function getInternalSession(): InternalUser | null {
@@ -57,8 +101,8 @@ export function getInternalSession(): InternalUser | null {
 }
 
 export function setInternalSession(user: InternalUser): void {
-  const { password: _pw, ...safe } = user;
-  localStorage.setItem(INTERNAL_SESSION_KEY, JSON.stringify({ ...safe, password: "" }));
+  const safe = { ...user, password: "" };
+  localStorage.setItem(INTERNAL_SESSION_KEY, JSON.stringify(safe));
 }
 
 export function clearInternalSession(): void {

@@ -8,6 +8,8 @@ import {
   generateUserId,
   getInternalSession,
   MOCK_ADMIN,
+  INTERNAL_DEFAULT_PASSWORD,
+  resetInternalPassword,
 } from "@/services/authStorage";
 import {
   getAccounts,
@@ -87,6 +89,81 @@ interface UserModalProps {
   currentUserId: string | null;
   onClose: () => void;
   onSaved: () => void;
+}
+
+interface ResetInternalPasswordModalProps {
+  user: InternalUser;
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function ResetInternalPasswordModal({
+  user,
+  onClose,
+  onDone,
+}: ResetInternalPasswordModalProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function handleReset() {
+    setSubmitting(true);
+    try {
+      await resetInternalPassword(user, INTERNAL_DEFAULT_PASSWORD);
+      setDone(true);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100">
+          <h2 className="font-bold text-slate-800 text-base">Reset mật khẩu người dùng nội bộ</h2>
+        </div>
+        <div className="px-6 py-5">
+          {done ? (
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              </div>
+              <p className="text-sm font-medium text-slate-800">Đã reset mật khẩu thành công.</p>
+              <p className="text-sm text-slate-500">
+                Mật khẩu mới của <strong>{user.fullName}</strong> là:
+              </p>
+              <code className="block bg-slate-100 text-slate-800 font-mono text-sm px-4 py-2 rounded-lg">{INTERNAL_DEFAULT_PASSWORD}</code>
+              <p className="text-xs text-slate-400">
+                Người dùng cần dùng mật khẩu này để đăng nhập lại.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600">
+                Mật khẩu của <strong>{user.fullName}</strong> sẽ được reset về{" "}
+                <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs font-mono">{INTERNAL_DEFAULT_PASSWORD}</code>.
+              </p>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                Sau thao tác này, mật khẩu cũ của tài khoản này sẽ không còn dùng được.
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+          {done ? (
+            <button onClick={onDone} className="px-4 py-2 text-sm font-medium bg-[#0f2d5e] text-white rounded-lg hover:bg-[#0d2550] transition-colors">Đóng</button>
+          ) : (
+            <>
+              <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Hủy</button>
+              <button onClick={handleReset} disabled={submitting} className="px-4 py-2 text-sm font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-60 transition-colors">
+                {submitting ? "Đang reset..." : "Xác nhận reset"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function UserModal({ mode, editingUser, currentUserId, onClose, onSaved }: UserModalProps) {
@@ -411,17 +488,19 @@ type NccModal =
   | { type: "reset"; account: SupplierAccount };
 
 export default function AdminUsersPage() {
+  const initialSession = getInternalSession();
   const [activeTab, setActiveTab] = useState<ActiveTab>("internal");
-  const [canManage, setCanManage] = useState(false);
+  const [canManage] = useState(() => canManageUsers(initialSession?.role || "Chỉ xem"));
   const [successMsg, setSuccessMsg] = useState("");
 
   // ── Internal tab state ─────────────────────────────────────────────────
   const [allUsers, setAllUsers] = useState<InternalUser[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId] = useState<string | null>(() => initialSession?.id ?? null);
   const [intSearch, setIntSearch] = useState("");
   const [intRoleFilter, setIntRoleFilter] = useState("");
   const [intStatusFilter, setIntStatusFilter] = useState("");
   const [userModal, setUserModal] = useState<{ mode: "create" | "edit"; user?: InternalUser } | null>(null);
+  const [resetInternalUser, setResetInternalUser] = useState<InternalUser | null>(null);
 
   // ── Supplier tab state ─────────────────────────────────────────────────
   const [suppliers, setSuppliers] = useState<SupplierAccount[]>([]);
@@ -445,11 +524,10 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
-    const session = getInternalSession();
-    setCanManage(canManageUsers(session?.role || "Chỉ xem"));
-    setCurrentUserId(session?.id ?? null);
-    loadInternalUsers();
-    loadSuppliers();
+    queueMicrotask(() => {
+      void loadInternalUsers();
+      void loadSuppliers();
+    });
   }, []);
 
   // ── Internal tab computed ──────────────────────────────────────────────
@@ -479,6 +557,13 @@ export default function AdminUsersPage() {
     setUserModal(null);
     await loadInternalUsers();
     showSuccess(userModal?.mode === "create" ? "Đã tạo tài khoản nội bộ mới." : "Đã cập nhật thông tin người dùng.");
+  }
+
+  async function handleResetInternalDone() {
+    const fullName = resetInternalUser?.fullName ?? "người dùng";
+    setResetInternalUser(null);
+    await loadInternalUsers();
+    showSuccess(`Đã reset mật khẩu của ${fullName} về ${INTERNAL_DEFAULT_PASSWORD}.`);
   }
 
   const isBuiltin = (u: InternalUser) => u.id === MOCK_ADMIN.id;
@@ -646,8 +731,14 @@ export default function AdminUsersPage() {
                           <td className="px-4 py-3 text-slate-400 text-xs hidden sm:table-cell">{formatDate(u.createdAt)}</td>
                           {canManage && (
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <button onClick={() => setUserModal({ mode: "edit", user: u })} className="text-xs font-medium text-[#0f2d5e] hover:text-[#c9a227] transition-colors">Sửa</button>
+                                <button
+                                  onClick={() => setResetInternalUser(u)}
+                                  className="text-xs font-medium text-amber-600 hover:text-amber-800 transition-colors"
+                                >
+                                  Reset MK
+                                </button>
                                 {!builtin && !isCurrent && (
                                   <button
                                     onClick={() => handleIntToggleLock(u)}
@@ -773,6 +864,13 @@ export default function AdminUsersPage() {
           currentUserId={currentUserId}
           onClose={() => setUserModal(null)}
           onSaved={handleUserModalSaved}
+        />
+      )}
+      {resetInternalUser && (
+        <ResetInternalPasswordModal
+          user={resetInternalUser}
+          onClose={() => setResetInternalUser(null)}
+          onDone={handleResetInternalDone}
         />
       )}
       {nccModal?.type === "edit" && (

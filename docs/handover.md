@@ -9,6 +9,8 @@ IMPORTANT:
 - Preserve architecture decisions.
 - Do not redesign the system.
 - Continue implementation incrementally.
+- Current architecture is PostgreSQL-backed production runtime.
+- DO NOT revert back to localStorage-first architecture.
 
 ---
 
@@ -17,27 +19,37 @@ IMPORTANT:
 ProcureHub is an MVP procurement / supplier bidding portal for Bia Hạ Long.
 
 Current phase:
-- MVP workflow completed
-- Now focusing on:
-  - bug fixing
+- PostgreSQL migration completed
+- Production runtime completed
+- Core CRUD completed
+- Public domain deployed
+- Currently focusing on:
+  - business flow stabilization
   - UX refinement
-  - role permissions
-  - data consistency
-  - preparing for future PostgreSQL migration
+  - permissions
+  - validation
+  - supplier workflow completion
+  - production hardening
+
+Current production domain:
+- https://dauthau.zlab.io.vn
 
 Tech stack:
 - Next.js
 - TypeScript
-- localStorage-first architecture
-- No backend yet
-- No PostgreSQL yet
-- No Supabase yet
+- PostgreSQL
+- Next.js API Routes
+- Repository pattern
+- PM2 runtime
+- Cloudflare Tunnel
+- Ubuntu homelab
 
 Current goal:
-- Stable MVP demo
+- Stable production-like MVP
 - Business flow correctness
+- Real PostgreSQL persistence
 - Good UX consistency
-- Easy future migration to PostgreSQL
+- Expandable architecture without overengineering
 
 ---
 
@@ -45,305 +57,259 @@ Current goal:
 
 ## DO NOT
 
-- DO NOT add backend/API
-- DO NOT add Prisma
-- DO NOT add ORM
-- DO NOT add Redux/Zustand unless absolutely necessary
-- DO NOT redesign the whole UI
-- DO NOT refactor entire architecture
-- DO NOT create enterprise abstractions
+- DO NOT redesign architecture
+- DO NOT replace repository pattern
+- DO NOT replace API routes
 - DO NOT introduce microservices
-- DO NOT replace existing services structure
-- DO NOT break localStorage compatibility without reason
+- DO NOT introduce enterprise abstractions
+- DO NOT add Prisma unless explicitly requested
+- DO NOT add Redux/Zustand unless truly necessary
+- DO NOT redesign the whole UI
+- DO NOT break PostgreSQL persistence
+- DO NOT move business data back to localStorage
+- DO NOT expose DATABASE_URL to client
+- DO NOT use NEXT_PUBLIC_DATABASE_URL
 - DO NOT overengineer
 
 ## DO
 
 - Keep implementation simple
-- Reuse existing services/helpers
+- Reuse existing repositories/helpers/services
 - Use TypeScript
 - Prefer functional components
 - Prefer lightweight helpers
-- Keep business logic in services when possible
+- Keep business logic in repositories/services
 - Maintain current UI style
 - Use Vietnamese business wording
-- Preserve existing routes
-- Preserve existing localStorage keys
+- Preserve existing routes when possible
+- Preserve business flow correctness
+- Run build after changes
 
 ---
 
 # 3. CURRENT ARCHITECTURE
 
-The project is intentionally:
-- localStorage-first
-- service-driven
-- simple CRUD style
-- MVP-oriented
+Current architecture:
 
-Data persistence:
-- localStorage only
+```txt
+Browser
+  ↓
+Next.js UI
+  ↓
+Next.js API Routes
+  ↓
+Repository layer
+  ↓
+PostgreSQL
+```
 
-Pages read/write through service layer helpers.
+Production routing:
 
-The project previously had scattered mock data.
-It has now been consolidated into unified localStorage sources.
+```txt
+https://dauthau.zlab.io.vn
+  ↓
+Cloudflare Tunnel
+  ↓
+Ubuntu homelab
+  ↓
+Next.js app on localhost:3001
+  ↓
+PostgreSQL on localhost:5432
+```
+
+Business persistence:
+- PostgreSQL
+
+localStorage:
+- only temporary session/mock state
+- NOT business master data
 
 ---
 
-# 4. MAIN LOCALSTORAGE KEYS
+# 4. INFRASTRUCTURE
 
-## Tenders
-Key:
-`procurehub_admin_tenders`
+## Ubuntu Server
 
-Used as:
-- single source of truth for all tenders
+Ubuntu 24.04 LTS homelab
 
-Read through:
-- getTenders()
-- getAdminTenderById()
+IPs:
+- LAN: 192.168.2.11
+- Tailscale: 100.91.188.83
 
-Used by:
-- homepage
+---
+
+## Docker Services
+
+Current containers:
+- postgres
+- adminer
+- portainer
+- n8n
+- open-webui
+- nginx-proxy-manager
+
+---
+
+## PM2
+
+Production process:
+- procurehub
+
+Commands:
+
+```bash
+pm2 list
+pm2 restart procurehub --update-env
+pm2 logs procurehub
+```
+
+---
+
+## Cloudflare Tunnel
+
+Tunnel name:
+- homelab
+
+Config:
+- /etc/cloudflared/config.yml
+
+Current hostnames:
+
+```txt
+n8n.zlab.io.vn      -> localhost:5678
+ai.zlab.io.vn       -> localhost:3000
+dauthau.zlab.io.vn  -> localhost:3001
+```
+
+Commands:
+
+```bash
+systemctl status cloudflared
+sudo systemctl restart cloudflared
+```
+
+---
+
+# 5. DATABASE
+
+## PostgreSQL
+
+Database:
+- procurehub
+
+User:
+- procurehub
+
+Password:
+- procurehub_demo_password
+
+Example connection:
+
+```env
+DATABASE_URL=postgresql://procurehub:procurehub_demo_password@100.91.188.83:5432/procurehub
+```
+
+Ubuntu localhost version:
+
+```env
+DATABASE_URL=postgresql://procurehub:procurehub_demo_password@localhost:5432/procurehub
+```
+
+---
+
+## Main Tables
+
+Core tables:
+- suppliers
+- tenders
+- tender_items
+- bids
+- bid_items
+- internal_users
+- procurement_groups
+- material_items
+- activity_logs
+
+---
+
+# 6. CURRENT DATA PERSISTENCE
+
+Business data persistence:
+- PostgreSQL only
+
+DO NOT store these in localStorage:
+- suppliers
+- tenders
+- bids
+- comparison data
+- procurement groups
+- internal users
+
+localStorage may still be used for:
+- current session
+- temporary UI state
+- mock auth session
+
+---
+
+# 7. CURRENT REPOSITORY / API STRUCTURE
+
+DB client:
+- lib/db.ts
+
+Repositories:
+- lib/repositories/
+
+API routes:
+- app/api/suppliers
+- app/api/tenders
+- app/api/bids
+- app/api/internal-users
+- app/api/procurement-groups
+- app/api/material-items
+- app/api/activity-logs
+
+Rules:
+- Client components must NOT access PostgreSQL directly
+- All DB access goes through:
+  - API routes
+  - repositories
+  - server-side code
+
+---
+
+# 8. CURRENT ROUTES
+
+## Public
+
+- /
 - /tenders
+- /tenders/[id]
+- /login
+- /supplier/register-account
+
+---
+
+## Supplier Portal
+
+- /supplier/dashboard
+- /supplier/profile
+- /supplier/tenders
+- /supplier/bids
+
+---
+
+## Admin Portal
+
+- /admin
 - /admin/tenders
-- tender detail pages
-- comparison pages
-
----
-
-## Supplier Profiles
-Key:
-`procurehub_supplier_profiles`
-
-Contains:
-- supplier profile
-- approval status
-- company info
-- capability info
-
-Important statuses:
-- Chưa hoàn thiện
-- Chờ xét duyệt
-- Đã duyệt
-- Yêu cầu bổ sung
-- Từ chối
-
-IMPORTANT:
-Only supplier status = "Đã duyệt" can submit bids.
-
----
-
-## Supplier Bids
-Key:
-`procurehub_supplier_bids`
-
-Contains:
-- bid header
-- bid items
-- bid statuses
-
-Bid statuses:
-- Đã nộp
-- Chờ xem xét
-- Đang đánh giá
-- Cần bổ sung
-- Được chọn
-- Không được chọn
-
----
-
-## Internal Users
-Key:
-`procurehub_internal_users`
-
-Contains:
-- admin/internal accounts
-
-Roles:
-- Admin
-- Trưởng phòng vật tư
-- Kế hoạch vật tư
-- Chỉ xem
-
----
-
-## Current Sessions
-
-Internal:
-`procurehub_current_internal_user`
-
-Supplier:
-`procurehub_current_supplier`
-
----
-
-# 5. TENDER FLOW
-
-Tender statuses:
-
-```txt
-Nháp
-→ Đang mở
-→ Sắp đóng
-→ Đã đóng
-→ Đang đánh giá
-→ Đã có kết quả
-→ Đã hủy
-```
-
-Public supplier visibility rules:
-
-- Supplier sees:
-  - Đang mở
-  - Sắp đóng
-
-- Supplier DOES NOT see closed tenders unless:
-  - supplier already submitted a bid
-
-Internal/admin:
-- sees all tenders
-
----
-
-# 6. SUPPLIER FLOW
-
-```txt
-Chưa hoàn thiện
-→ Chờ xét duyệt
-→ Đã duyệt
-→ Yêu cầu bổ sung
-→ Từ chối
-```
-
-Rules:
-- only "Đã duyệt" suppliers can:
-  - submit bids
-  - see bid action button
-
-Suppliers not approved:
-- can still browse public tenders
-- cannot submit bids
-
-Validation exists BOTH:
-- UI layer
-- service/business layer
-
----
-
-# 7. BID MODEL
-
-IMPORTANT:
-Bids are now ITEM-BASED.
-
-OLD total-only bid model is deprecated.
-
-Current structure:
-
-```ts
-type Bid = {
-  id: string;
-  bidCode: string;
-
-  tenderId: string;
-  tenderCode: string;
-  tenderTitle: string;
-
-  supplierId: string;
-  supplierName: string;
-
-  status:
-    | "Đã nộp"
-    | "Chờ xem xét"
-    | "Đang đánh giá"
-    | "Cần bổ sung"
-    | "Được chọn"
-    | "Không được chọn";
-
-  submittedAt: string;
-
-  totalAmount: number;
-
-  deliveryTime?: string;
-  paymentTerms?: string;
-  warrantyPolicy?: string;
-  note?: string;
-
-  items: BidItem[];
-};
-```
-
-Bid item:
-
-```ts
-type BidItem = {
-  id: string;
-
-  tenderItemId: string;
-
-  itemName: string;
-  specification?: string;
-
-  quantity: number;
-  unit: string;
-
-  unitPrice: number;
-  amount: number;
-
-  brand?: string;
-  origin?: string;
-  deliveryTime?: string;
-  note?: string;
-};
-```
-
-Rules:
-- amount = quantity * unitPrice
-- totalAmount = sum(items.amount)
-
-Backward compatibility:
-- old bids may not contain items[]
-- code must not crash
-
----
-
-# 8. CURRENT COMPLETED FEATURES
-
-## Admin
-
-Completed:
-- admin dashboard
-- tender management
-- supplier management
-- bid management
-- bid comparison
-- internal user management
-- supplier account management
-- tender winner selection
-
----
-
-## Supplier
-
-Completed:
-- supplier onboarding
-- supplier profile
-- supplier dashboard
-- public tenders
-- bid submission
-- submitted bid tracking
-- winner/result viewing
-
----
-
-## Comparison
-
-Completed:
-- compare bids by supplier
-- compare bids by item
-- highlight lowest price
-- select winner supplier
-- update tender result
+- /admin/tenders/create
+- /admin/tenders/[id]
+- /admin/suppliers
+- /admin/suppliers/[id]
+- /admin/bids
+- /admin/bid-comparison
+- /admin/users
 
 ---
 
@@ -361,44 +327,140 @@ Admin creates tender
 → Supplier sees bid result
 ```
 
-MVP business flow is considered COMPLETE.
-
-Current phase:
-- bug fixing
-- UX refinement
-- sorting consistency
-- permission consistency
+Current system already supports:
+- real PostgreSQL persistence
+- production runtime
+- multi-user shared data
 
 ---
 
-# 10. CURRENT KNOWN ISSUES / RECENT FIXES
+# 10. TENDER FLOW
 
-Recently fixed:
-- unified tender source
-- removed legacy mock tender source
-- hidden closed tenders from suppliers
-- supplier approval validation before bid submission
-- item-based bidding
-- comparison page
+Tender statuses:
+
+```txt
+Nháp
+→ Đang mở
+→ Đã đóng
+→ Đang đánh giá
+→ Đã có kết quả
+→ Đã hủy
+```
+
+Rules:
+- Suppliers only see public/open tenders
+- Internal/admin sees all tenders
+
+---
+
+# 11. SUPPLIER FLOW
+
+Supplier statuses:
+
+```txt
+Chưa hoàn thiện
+→ Chờ xét duyệt
+→ Đã duyệt
+→ Yêu cầu bổ sung
+→ Từ chối
+```
+
+Rules:
+- Only approved suppliers can submit bids
+- Validation must exist:
+  - UI layer
+  - API/business layer
+
+---
+
+# 12. BID MODEL
+
+Bids are ITEM-BASED.
+
+Structure:
+
+```ts
+type Bid = {
+  id: string;
+
+  tenderId: string;
+  supplierId: string;
+
+  status:
+    | "Đã nộp"
+    | "Chờ xem xét"
+    | "Đang đánh giá"
+    | "Cần bổ sung"
+    | "Được chọn"
+    | "Không được chọn";
+
+  totalAmount: number;
+
+  items: BidItem[];
+};
+```
+
+Rules:
+- amount = quantity * unitPrice
+- totalAmount = sum(items.amount)
+
+---
+
+# 13. CURRENT COMPLETED FEATURES
+
+## Admin
+
+Completed:
+- admin dashboard
+- tender management
+- supplier management
+- bid management
+- bid comparison
+- internal user management
 - winner selection
 
-Recent work:
-- sorting improvements
-- dashboard activity ordering
-- supplier dashboard activities optimization
+---
+
+## Supplier
+
+Completed:
+- supplier onboarding
+- supplier profile
+- supplier dashboard
+- public tenders
+- bid submission
+- bid tracking
+
+---
+
+## Infrastructure
+
+Completed:
+- PostgreSQL migration
+- API routes
+- repository pattern
+- Ubuntu production runtime
+- PM2 runtime
+- Cloudflare Tunnel
+- public production domain
+
+---
+
+# 14. CURRENT KNOWN ISSUES / ACTIVE AREAS
 
 Potential unstable areas:
 - sorting consistency
-- localStorage migration edge cases
-- old mock bid compatibility
-- supplier permission edge cases
-- timeline ordering
+- validation consistency
+- permission edge cases
+- older localStorage compatibility remnants
+- dashboard ordering
+- bid comparison logic refinement
 
 ---
 
-# 11. UI / UX STYLE
+# 15. UI / UX STYLE
 
-Keep existing style.
+Keep current style.
 
 ## Admin UI
 - dark navy sidebar
@@ -416,45 +478,139 @@ DO NOT redesign globally.
 
 ---
 
-# 12. CODING STYLE
+# 16. DEPLOYMENT WORKFLOW
 
-Preferred:
-- small helper functions
-- readable code
-- lightweight utilities
-- simple sorting/filtering
-- avoid giant files
+## Local Development
 
-Avoid:
-- massive abstractions
-- premature optimization
-- enterprise architecture
+Laptop:
+
+```bash
+npm run dev
+```
 
 ---
 
-# 13. FUTURE ROADMAP (NOT NOW)
+## Push Code
+
+```bash
+git add .
+git commit -m "message"
+git push
+```
+
+---
+
+## Production Deploy
+
+Ubuntu:
+
+```bash
+cd /data/homelab/apps/procurehub
+
+git pull
+
+npm install
+
+npm run build
+
+pm2 restart procurehub --update-env
+```
+
+---
+
+# 17. DEBUGGING QUICK CHECKS
+
+## App not responding
+
+```bash
+pm2 list
+pm2 logs procurehub
+curl http://localhost:3001
+```
+
+---
+
+## Domain not responding
+
+```bash
+systemctl status cloudflared
+sudo systemctl restart cloudflared
+curl -I https://dauthau.zlab.io.vn
+```
+
+---
+
+## DATABASE_URL missing
+
+Fix:
+
+```bash
+pm2 restart procurehub --update-env
+```
+
+Check `.env.local` on Ubuntu.
+
+---
+
+## localhost has data but domain does not
+
+Check:
+
+```bash
+curl http://localhost:3001/api/suppliers
+curl https://dauthau.zlab.io.vn/api/suppliers
+```
+
+Possible causes:
+- stale production code
+- wrong tunnel route
+- missing env
+- PM2 not restarted
+
+---
+
+# 18. CURRENT PRIORITY
+
+Priority order:
+
+1. Bug fixing
+2. CRUD stabilization
+3. Validation consistency
+4. UX refinement
+5. Supplier workflow completion
+6. Bid comparison refinement
+7. Dashboard improvements
+8. Auth + RBAC
+9. File uploads
+10. Notifications
+
+NOT:
+- architecture rewrite
+- microservices
+- enterprise redesign
+
+---
+
+# 19. FUTURE ROADMAP
 
 Future plans:
-- PostgreSQL migration
-- backend/API
-- authentication server
-- file uploads
-- audit logs
-- approval workflow
-- notifications
-- email
-- Excel export
+- Microsoft login
+- Supplier email verification
+- RBAC
+- File uploads
+- Email notifications
+- Audit logs
+- Approval workflow
+- Backup automation
+- CI/CD
+- ERP integration
+- Security hardening
 
-NOT part of current phase.
-
-Current phase remains:
-- stabilize MVP
-- fix bugs
-- improve UX
+NOT part of current stabilization phase.
 
 ---
 
-# 14. HOW TO WORK ON THIS PROJECT
+# 20. HOW TO WORK ON THIS PROJECT
 
 Before coding:
 
@@ -463,9 +619,10 @@ Before coding:
    - AI_CONTEXT.md
 
 2. Inspect:
-   - current services
-   - existing routes
-   - existing storage helpers
+   - repositories
+   - API routes
+   - existing services
+   - existing business flow
 
 3. Explain understanding briefly
 
@@ -479,81 +636,23 @@ When editing:
 Always:
 - run build
 - fix TypeScript errors
+- preserve production compatibility
 
 ---
 
-# 15. IMPORTANT BUSINESS RULES
-
-## Supplier permissions
-
-Supplier:
-- only sees own bids
-- never sees competitor bids
-
-Internal/admin:
-- sees all bids
-
----
-
-## Closed tenders
-
-Closed tenders:
-- hidden from suppliers WITHOUT bids
-
-Suppliers WITH submitted bids:
-- can still view tender detail
-- can still view their submitted bid
-
----
-
-## Winner selection
-
-When selecting winner:
-- selected bid → "Được chọn"
-- other bids → "Không được chọn"
-- tender → "Đã có kết quả"
-
----
-
-## Supplier approval
-
-Only approved suppliers:
-- can submit bids
-- can see bid action
-
-Validation must exist:
-- UI
-- service layer
-
----
-
-# 16. CURRENT PRIORITY
-
-Priority order:
-
-1. Bug fixing
-2. UX refinement
-3. Permission consistency
-4. Sorting consistency
-5. Timeline/activity quality
-6. Prepare for future DB migration
-
-NOT:
-- backend rewrite
-- architecture rewrite
-
----
-
-# 17. FINAL NOTE
+# 21. FINAL NOTE
 
 This project intentionally prioritizes:
 - speed
 - clarity
 - business flow correctness
-- MVP usability
+- production-like MVP usability
 
-Do not turn this into an enterprise platform yet.
+Do not turn this into a giant enterprise platform yet.
 
-Keep it practical.
-Keep it incremental.
-Keep it maintainable.
+Keep it:
+- practical
+- incremental
+- maintainable
+- demo-friendly
+- business-focused
