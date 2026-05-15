@@ -403,14 +403,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Demo hints */}
-            {tab === "internal" && (
-              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-700 space-y-1.5">
-                <p className="font-semibold text-amber-800">Tài khoản demo:</p>
-                <p>Email: <code className="bg-amber-100 px-1 rounded font-mono">admin@biahalong.vn</code></p>
-                <p>Mật khẩu: <code className="bg-amber-100 px-1 rounded font-mono">admin123</code></p>
-              </div>
-            )}
             {tab === "supplier" && (
               <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700">
                 <span className="font-semibold">Hướng dẫn:</span>{" "}
