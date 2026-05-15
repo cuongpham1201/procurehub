@@ -2,17 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  getCurrentSession,
-} from "@/services/supplierAccountStorage";
-import {
-  getInternalSession,
-  clearAllSessions,
-} from "@/services/authStorage";
-import type { SupplierAccount } from "@/types/supplierAccount";
-import type { InternalUser } from "@/types/internalUser";
+import { useCurrentUser, logout } from "@/hooks/useCurrentUser";
 
 const NAV_ITEMS = [
   { label: "Trang chủ", href: "/" },
@@ -30,18 +21,11 @@ function isNavActive(href: string, pathname: string): boolean {
 export default function PublicHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const [supplier, setSupplier] = useState<SupplierAccount | null>(null);
-  const [internalUser, setInternalUser] = useState<InternalUser | null>(null);
+  const { user, refetch } = useCurrentUser();
 
-  useEffect(() => {
-    setSupplier(getCurrentSession());
-    setInternalUser(getInternalSession());
-  }, []);
-
-  function handleLogout() {
-    clearAllSessions();
-    setSupplier(null);
-    setInternalUser(null);
+  async function handleLogout() {
+    await logout();
+    refetch();
     router.push("/");
   }
 
@@ -95,12 +79,11 @@ export default function PublicHeader() {
 
           {/* Auth area */}
           <div className="flex items-center gap-2">
-            {internalUser ? (
-              /* Internal/admin logged in */
+            {user?.kind === "internal" ? (
               <>
                 <span className="hidden sm:flex items-center gap-1.5 text-sm text-slate-600">
                   <span className="inline-block w-2 h-2 bg-[#c9a227] rounded-full" />
-                  <span className="max-w-[140px] truncate">{internalUser.name}</span>
+                  <span className="max-w-[140px] truncate">{user.name}</span>
                 </span>
                 <Link
                   href="/admin"
@@ -115,11 +98,10 @@ export default function PublicHeader() {
                   Đăng xuất
                 </button>
               </>
-            ) : supplier ? (
-              /* Supplier logged in */
+            ) : user?.kind === "supplier" ? (
               <>
                 <span className="hidden sm:block text-sm text-slate-600 max-w-[140px] truncate">
-                  {supplier.companyName}
+                  {user.name}
                 </span>
                 <Link
                   href="/supplier/dashboard"
@@ -135,7 +117,6 @@ export default function PublicHeader() {
                 </button>
               </>
             ) : (
-              /* Not logged in */
               <>
                 <Link
                   href="/login"

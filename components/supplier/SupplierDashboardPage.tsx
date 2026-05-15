@@ -3,12 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  getCurrentSession,
-  clearSession,
-  getAccounts,
-} from "@/services/supplierAccountStorage";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import { useEffect, useState, useCallback } from "react";
+import { getAccounts } from "@/services/supplierAccountStorage";
+import { useCurrentUser, logout } from "@/hooks/useCurrentUser";
 import { getBidsBySupplier } from "@/services/supplierBidStorage";
 import { getTenders, ensureTenderSeedData } from "@/services/tenderStorage";
 import type { SupplierAccount } from "@/types/supplierAccount";
@@ -163,112 +161,146 @@ function StatCard({
   );
 }
 
-// ── activity builder ──────────────────────────────────────────────────────
+// ── status normalizer (module-scope so builders can use it) ───────────────
 
-interface SupplierActivity {
+function normalizeStatus(a: SupplierAccount): string {
+  if (!a.profileCompleted) return "Chưa hoàn thiện";
+  if (!a.status || a.status.trim() === "") return "Chờ xét duyệt";
+  return a.status;
+}
+
+// ── action items (things that need attention RIGHT NOW) ───────────────────
+
+interface ActionItem {
   id: string;
-  type: "profile" | "bid" | "tender";
-  priority: "high" | "medium" | "low";
-  colorScheme: "amber" | "emerald" | "orange" | "blue" | "slate" | "indigo" | "green" | "red";
+  colorScheme: "amber" | "orange" | "red";
   title: string;
   description: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+function buildActionItems(account: SupplierAccount, myBids: SupplierBid[]): ActionItem[] {
+  const items: ActionItem[] = [];
+  const status = normalizeStatus(account);
+
+  if (status === "Chưa hoàn thiện") {
+    items.push({
+      id: "profile-incomplete", colorScheme: "amber",
+      title: "Hồ sơ nhà cung cấp chưa hoàn thiện",
+      description: "Hoàn thiện hồ sơ để được xét duyệt và tham gia báo giá.",
+      actionLabel: "Hoàn thiện hồ sơ", actionHref: "/supplier/profile",
+    });
+  } else if (status === "Yêu cầu bổ sung") {
+    items.push({
+      id: "profile-supplement", colorScheme: "amber",
+      title: "Hồ sơ cần bổ sung theo yêu cầu của phòng mua sắm",
+      description: "Vui lòng cập nhật thông tin còn thiếu để tiếp tục được xem xét phê duyệt.",
+      actionLabel: "Cập nhật hồ sơ", actionHref: "/supplier/profile",
+    });
+  } else if (status === "Từ chối") {
+    items.push({
+      id: "profile-rejected", colorScheme: "red",
+      title: "Hồ sơ chưa được chấp thuận",
+      description: "Liên hệ phòng kế hoạch vật tư để biết thêm chi tiết và hướng xử lý.",
+      actionLabel: "Xem hồ sơ", actionHref: "/supplier/profile",
+    });
+  } else if (status === "Tạm khóa") {
+    items.push({
+      id: "profile-locked", colorScheme: "orange",
+      title: "Tài khoản đang bị tạm khóa",
+      description: "Liên hệ phòng kế hoạch vật tư để biết lý do và hướng xử lý.",
+      actionLabel: "Xem hồ sơ", actionHref: "/supplier/profile",
+    });
+  }
+
+  // Bids that require action
+  for (const bid of myBids) {
+    if (bid.status === "Cần bổ sung") {
+      const tLabel = [bid.tenderCode, bid.tenderTitle ?? bid.tenderName ?? ""]
+        .filter(Boolean).join(" – ");
+      items.push({
+        id: `bid-supplement-${bid.id}`, colorScheme: "orange",
+        title: "Báo giá cần bổ sung thông tin",
+        description: tLabel || "Vui lòng kiểm tra phản hồi từ phòng mua sắm.",
+        actionLabel: "Cập nhật báo giá", actionHref: "/supplier/bids",
+      });
+    }
+  }
+
+  return items;
+}
+
+// ── recent history (events/info, no action needed) ────────────────────────
+
+interface HistoryItem {
+  id: string;
+  colorScheme: "green" | "emerald" | "teal" | "blue" | "slate" | "indigo";
+  title: string;
+  description?: string;
   date?: string;
   actionLabel?: string;
   actionHref?: string;
 }
 
-function buildSupplierActivities(
-  account: SupplierAccount,
-  myBids: SupplierBid[],
-  unbidOpenTenders: number,
-): SupplierActivity[] {
-  const activities: SupplierActivity[] = [];
+function buildHistoryItems(account: SupplierAccount, myBids: SupplierBid[]): HistoryItem[] {
+  const items: HistoryItem[] = [];
+  const status = normalizeStatus(account);
 
-  const status = !account.profileCompleted
-    ? "Chưa hoàn thiện"
-    : !account.status || account.status.trim() === ""
-    ? "Chờ xét duyệt"
-    : account.status;
-
-  // Profile activity
-  if (status === "Chưa hoàn thiện") {
-    activities.push({ id: "profile-incomplete", type: "profile", priority: "high", colorScheme: "amber",
-      title: "Hồ sơ nhà cung cấp chưa hoàn thiện",
-      description: "Hoàn thiện hồ sơ để được xét duyệt và tham gia báo giá.",
-      actionLabel: "Hoàn thiện hồ sơ", actionHref: "/supplier/profile" });
-  } else if (status === "Yêu cầu bổ sung") {
-    activities.push({ id: "profile-supplement", type: "profile", priority: "high", colorScheme: "amber",
-      title: "Cần bổ sung hồ sơ",
-      description: "Phòng mua sắm yêu cầu bổ sung thông tin trước khi phê duyệt.",
-      actionLabel: "Cập nhật hồ sơ", actionHref: "/supplier/profile" });
-  } else if (status === "Từ chối") {
-    activities.push({ id: "profile-rejected", type: "profile", priority: "high", colorScheme: "red",
-      title: "Hồ sơ chưa được chấp thuận",
-      description: "Liên hệ phòng kế hoạch vật tư để biết thêm chi tiết.",
-      actionLabel: "Xem hồ sơ", actionHref: "/supplier/profile" });
-  } else if (status === "Tạm khóa") {
-    activities.push({ id: "profile-locked", type: "profile", priority: "high", colorScheme: "orange",
-      title: "Tài khoản đang bị tạm khóa",
-      description: "Liên hệ phòng kế hoạch vật tư để biết lý do và hướng xử lý.",
-      actionLabel: "Xem hồ sơ", actionHref: "/supplier/profile" });
-  } else if (status === "Chờ xét duyệt") {
-    activities.push({ id: "profile-pending", type: "profile", priority: "medium", colorScheme: "blue",
-      title: "Hồ sơ đang chờ xét duyệt",
-      description: "Bia Hạ Long đang xem xét hồ sơ nhà cung cấp của bạn. Thời gian xét duyệt thường 1–3 ngày làm việc.",
-      actionLabel: "Xem hồ sơ", actionHref: "/supplier/profile" });
-  } else if (status === "Đã duyệt") {
-    activities.push({ id: "profile-approved", type: "profile", priority: "low", colorScheme: "green",
+  // Profile status as a history entry
+  if (status === "Đã duyệt") {
+    items.push({
+      id: "profile-approved", colorScheme: "green",
       title: "Hồ sơ đã được duyệt",
-      description: "Bạn có thể tham gia báo giá các gói thầu đang mở.",
-      actionLabel: "Xem gói thầu", actionHref: "/tenders" });
+      description: "Tài khoản đã được phê duyệt. Bạn có thể tham gia báo giá.",
+      actionLabel: "Xem gói thầu", actionHref: "/tenders",
+    });
+  } else if (status === "Chờ xét duyệt") {
+    items.push({
+      id: "profile-pending", colorScheme: "blue",
+      title: "Hồ sơ đang chờ xét duyệt",
+      description: "Bia Hạ Long đang xem xét. Thời gian thường 1–3 ngày làm việc.",
+    });
   }
 
-  // Bid activities
-  for (const bid of myBids) {
-    const tLabel = [bid.tenderCode, bid.tenderTitle ?? bid.tenderName ?? ""].filter(Boolean).join(" – ");
+  // Recent bid events (newest first, max 4)
+  const recentBids = [...myBids]
+    .sort((a, b) => {
+      const ta = new Date(a.submittedAt ?? a.createdAt ?? 0).getTime();
+      const tb = new Date(b.submittedAt ?? b.createdAt ?? 0).getTime();
+      return tb - ta;
+    })
+    .slice(0, 4);
+
+  for (const bid of recentBids) {
+    const tLabel = [bid.tenderCode, bid.tenderTitle ?? bid.tenderName ?? ""]
+      .filter(Boolean).join(" – ");
     const date = bid.submittedAt ?? bid.createdAt;
+
     if (bid.status === "Được chọn") {
-      activities.push({ id: `bid-chosen-${bid.id}`, type: "bid", priority: "high", colorScheme: "emerald",
+      items.push({ id: `bid-chosen-${bid.id}`, colorScheme: "emerald",
         title: "Chúc mừng! Báo giá được chọn", description: tLabel, date,
         actionLabel: "Xem báo giá", actionHref: "/supplier/bids" });
-    } else if (bid.status === "Cần bổ sung") {
-      activities.push({ id: `bid-supplement-${bid.id}`, type: "bid", priority: "high", colorScheme: "orange",
-        title: "Báo giá cần bổ sung thông tin",
-        description: `${tLabel}. Vui lòng kiểm tra phản hồi từ phòng mua sắm.`, date,
-        actionLabel: "Xem chi tiết", actionHref: "/supplier/bids" });
+    } else if (bid.status === "Đã bổ sung") {
+      items.push({ id: `bid-resubmit-${bid.id}`, colorScheme: "teal",
+        title: "Đã gửi lại báo giá", description: tLabel, date,
+        actionLabel: "Xem báo giá", actionHref: "/supplier/bids" });
     } else if (bid.status === "Không được chọn") {
-      activities.push({ id: `bid-rejected-${bid.id}`, type: "bid", priority: "medium", colorScheme: "slate",
-        title: "Báo giá không được chọn",
-        description: `${tLabel}. Cảm ơn bạn đã tham gia báo giá.`, date,
+      items.push({ id: `bid-rejected-${bid.id}`, colorScheme: "slate",
+        title: "Báo giá không được chọn", description: tLabel, date,
         actionLabel: "Xem kết quả", actionHref: "/supplier/bids" });
     } else if (bid.status === "Đang đánh giá") {
-      activities.push({ id: `bid-eval-${bid.id}`, type: "bid", priority: "medium", colorScheme: "indigo",
-        title: "Báo giá đang được đánh giá",
-        description: `${tLabel}. Phòng mua sắm đang xem xét báo giá của bạn.`, date,
+      items.push({ id: `bid-eval-${bid.id}`, colorScheme: "indigo",
+        title: "Báo giá đang được đánh giá", description: tLabel, date,
         actionLabel: "Theo dõi", actionHref: "/supplier/bids" });
     } else if (bid.status === "Đã nộp" || bid.status === "Chờ xem xét") {
-      activities.push({ id: `bid-submitted-${bid.id}`, type: "bid", priority: "low", colorScheme: "slate",
+      items.push({ id: `bid-submitted-${bid.id}`, colorScheme: "slate",
         title: "Báo giá đã nộp – chờ xử lý", description: tLabel, date,
         actionLabel: "Xem báo giá", actionHref: "/supplier/bids" });
     }
   }
 
-  // Available tenders (approved only)
-  if (status === "Đã duyệt" && unbidOpenTenders > 0) {
-    activities.push({ id: "tenders-available", type: "tender", priority: "medium", colorScheme: "green",
-      title: `Có ${unbidOpenTenders} gói thầu đang chờ báo giá`,
-      description: "Xem danh sách gói thầu đang mở và gửi báo giá phù hợp.",
-      actionLabel: "Xem ngay", actionHref: "/tenders" });
-  }
-
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  activities.sort((a, b) => {
-    if (a.priority !== b.priority) return priorityOrder[a.priority] - priorityOrder[b.priority];
-    const ta = a.date ? new Date(a.date).getTime() : 0;
-    const tb = b.date ? new Date(b.date).getTime() : 0;
-    return tb - ta;
-  });
-  return activities.slice(0, 6);
+  return items.slice(0, 5);
 }
 
 // ── activity color map ─────────────────────────────────────────────────────
@@ -281,29 +313,9 @@ const ACT_COLORS: Record<string, { bg: string; border: string; icon: string; tit
   slate:   { bg: "bg-slate-50",  border: "border-slate-200",  icon: "text-slate-400",  title: "text-slate-700",  desc: "text-slate-500",  btn: "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" },
   indigo:  { bg: "bg-slate-50",  border: "border-slate-200",  icon: "text-[#c9a227]",  title: "text-slate-800",  desc: "text-slate-600",  btn: "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200" },
   green:   { bg: "bg-slate-50",  border: "border-slate-200",  icon: "text-[#0f2d5e]",  title: "text-slate-800",  desc: "text-slate-600",  btn: "bg-[#c9a227]/10 hover:bg-[#c9a227]/20 text-[#7a6010] border-[#c9a227]/20" },
+  teal:    { bg: "bg-teal-50",   border: "border-teal-200",   icon: "text-teal-500",   title: "text-teal-900",   desc: "text-teal-700",   btn: "bg-teal-100 hover:bg-teal-200 text-teal-900 border-teal-200"    },
   red:     { bg: "bg-red-50",    border: "border-red-200",    icon: "text-red-400",    title: "text-red-900",    desc: "text-red-700",    btn: "bg-red-100 hover:bg-red-200 text-red-900 border-red-200"         },
 };
-
-function ActivityIcon({ item }: { item: SupplierActivity }) {
-  if (item.type === "bid" && item.colorScheme === "emerald") {
-    return (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    );
-  }
-  if (item.type === "bid") return <IconBid />;
-  if (item.type === "tender") return <IconTenders />;
-  if (item.colorScheme === "green" || item.colorScheme === "emerald") {
-    return (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    );
-  }
-  if (item.colorScheme === "blue") return <IconClock />;
-  return <IconAlert />;
-}
 
 function formatActDate(iso?: string): string {
   if (!iso) return "";
@@ -315,35 +327,48 @@ function formatActDate(iso?: string): string {
 // ── main component ─────────────────────────────────────────────────────────
 export default function SupplierDashboardPage() {
   const router = useRouter();
+  const { user: session, loading: sessionLoading, refetch: refetchSession } = useCurrentUser();
   const [account, setAccount] = useState<SupplierAccount | null>(null);
   const [myBids, setMyBids] = useState<SupplierBid[]>([]);
   const [openTenders, setOpenTenders] = useState(0);
   const [unbidOpenTenders, setUnbidOpenTenders] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    ensureTenderSeedData();
-    async function loadData() {
-      const allOpen = (await getTenders()).filter((t) => t.status === "Đang mở" || t.status === "Sắp đóng");
-      setOpenTenders(allOpen.length);
+  const loadData = useCallback(async () => {
+    const allOpen = (await getTenders()).filter((t) => t.status === "Đang mở" || t.status === "Sắp đóng");
+    setOpenTenders(allOpen.length);
 
-      const session = getCurrentSession();
-      if (!session) {
-        setUnbidOpenTenders(allOpen.length);
-        setLoading(false);
-        return;
-      }
-      const accounts = await getAccounts();
-      const fresh = accounts.find((a) => a.id === session.id);
-      setAccount(fresh ?? session);
-      const bids = await getBidsBySupplier(session.id);
-      setMyBids(bids);
-      const bidTenderIds = new Set(bids.map((b) => b.tenderId));
-      setUnbidOpenTenders(allOpen.filter((t) => !bidTenderIds.has(t.id)).length);
+    if (!session || session.kind !== "supplier") {
+      setUnbidOpenTenders(allOpen.length);
       setLoading(false);
+      return;
     }
+    const accounts = await getAccounts();
+    const fresh = accounts.find((a) => a.id === session.id);
+    setAccount(fresh ?? null);
+    const bids = await getBidsBySupplier(session.id);
+    setMyBids(bids);
+    const bidTenderIds = new Set(bids.map((b) => b.tenderId));
+    setUnbidOpenTenders(allOpen.filter((t) => !bidTenderIds.has(t.id)).length);
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    ensureTenderSeedData();
     loadData();
-  }, []);
+  }, [session, sessionLoading, loadData]);
+
+  useEffect(() => {
+    if (sessionLoading || !session) return;
+    const interval = setInterval(loadData, 30_000);
+    const handleVisibility = () => { if (document.visibilityState === "visible") loadData(); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [session, sessionLoading, loadData]);
 
   if (loading) {
     return (
@@ -355,16 +380,15 @@ export default function SupplierDashboardPage() {
 
   if (!account) return <NotLoggedIn />;
 
-  function handleLogout() {
-    clearSession();
+  const actionItems = buildActionItems(account, myBids);
+  const historyItems = buildHistoryItems(account, myBids);
+
+  async function handleLogout() {
+    await logout();
+    refetchSession();
     router.push("/");
   }
 
-  function normalizeStatus(a: SupplierAccount): string {
-    if (!a.profileCompleted) return "Chưa hoàn thiện";
-    if (!a.status || a.status.trim() === "") return "Chờ xét duyệt";
-    return a.status;
-  }
   const isApproved = normalizeStatus(account) === "Đã duyệt";
 
   function getStatusBadge(status: string) {
@@ -383,7 +407,7 @@ export default function SupplierDashboardPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header
-        className="sticky top-0 z-10 border-b border-white/10"
+        className="sticky top-0 z-30 border-b border-white/10"
         style={{ background: "var(--brand-primary)" }}
       >
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
@@ -402,11 +426,12 @@ export default function SupplierDashboardPage() {
             <div className="hidden sm:block w-px h-5 bg-white/20 shrink-0" />
             <span className="hidden sm:block text-sm text-white/55">Portal nhà cung cấp</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 text-sm text-white/65">
+          <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2 text-sm text-white/65 mr-1">
               <Building2 className="w-3.5 h-3.5 text-white/40 shrink-0" strokeWidth={1.8} />
               <span className="truncate max-w-[200px]">{account.companyName}</span>
             </div>
+            <NotificationBell variant="supplier" />
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 text-sm text-white/65 hover:text-white border border-white/20 hover:border-white/40 px-3 py-1.5 rounded-lg transition-colors"
@@ -598,11 +623,11 @@ export default function SupplierDashboardPage() {
             href="/supplier/bids"
           />
           <StatCard
-            label="Thông báo mới"
-            value={1}
-            sub="Chào mừng đến hệ thống"
+            label="Việc cần xử lý"
+            value={actionItems.length}
+            sub={actionItems.length > 0 ? "Cần xử lý ngay" : "Không có việc cần xử lý"}
             icon={<Bell className="w-5 h-5" strokeWidth={1.8} />}
-            accent="bg-slate-100 text-slate-500"
+            accent={actionItems.length > 0 ? "bg-amber-50 text-amber-500" : "bg-slate-100 text-slate-500"}
           />
         </div>
 
@@ -719,45 +744,105 @@ export default function SupplierDashboardPage() {
             </div>
           </div>
 
-          {/* Activity / notifications */}
+          {/* Activity / notifications — split into action items + recent history */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl border border-[var(--border-default)] overflow-hidden">
+              {/* Header */}
               <div className="px-5 py-3.5 border-b border-[var(--border-muted)] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4 text-slate-400" strokeWidth={1.8} />
                   <h2 className="text-[13.5px] font-semibold text-slate-800">Thông báo &amp; hoạt động</h2>
                 </div>
-                <span className="text-xs text-slate-400">Cập nhật tự động</span>
+                <Link
+                  href="/notifications"
+                  className="text-[11px] text-slate-400 hover:text-[var(--brand-primary)] transition-colors font-medium"
+                >
+                  Xem tất cả →
+                </Link>
               </div>
-              <div className="p-5">
-              {(() => {
-                const activities = buildSupplierActivities(account, myBids, unbidOpenTenders);
-                if (activities.length === 0) {
-                  return (
-                    <p className="text-sm text-slate-400 text-center py-10 leading-relaxed">
-                      Chưa có thông báo mới.<br />
-                      Khi có cập nhật về hồ sơ hoặc báo giá, hệ thống sẽ hiển thị tại đây.
-                    </p>
-                  );
-                }
-                return (
-                  <div className="space-y-2.5">
-                    {activities.map((item) => {
-                      const c = ACT_COLORS[item.colorScheme] ?? ACT_COLORS.slate;
-                      const dateStr = formatActDate(item.date);
+
+              {/* ── Việc cần xử lý ── */}
+              <div className="px-5 pt-4 pb-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest">Việc cần xử lý</span>
+                  {actionItems.length > 0 && (
+                    <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full leading-none">
+                      {actionItems.length}
+                    </span>
+                  )}
+                </div>
+
+                {actionItems.length === 0 ? (
+                  <div className="flex items-center gap-2.5 py-3 px-3.5 bg-green-50 border border-green-100 rounded-xl">
+                    <CheckCircle className="w-4 h-4 text-green-500 shrink-0" strokeWidth={2} />
+                    <span className="text-[13px] text-green-800">
+                      {isApproved
+                        ? "Không có việc cần xử lý. Hồ sơ đã được duyệt — có thể tham gia báo giá."
+                        : "Không có việc cần xử lý ngay lúc này."}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {actionItems.map((item) => {
+                      const c = ACT_COLORS[item.colorScheme] ?? ACT_COLORS.amber;
                       return (
                         <div key={item.id} className={`flex items-start gap-3 p-3 rounded-xl border ${c.bg} ${c.border}`}>
                           <span className={`mt-0.5 shrink-0 ${c.icon}`}>
-                            <ActivityIcon item={item} />
+                            {item.colorScheme === "red"
+                              ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              : <AlertTriangle className="w-4 h-4" strokeWidth={2} />}
                           </span>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-medium leading-snug ${c.title}`}>{item.title}</p>
+                            <p className={`text-xs mt-0.5 leading-relaxed ${c.desc}`}>{item.description}</p>
+                          </div>
+                          <Link
+                            href={item.actionHref}
+                            className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors border whitespace-nowrap ${c.btn}`}
+                          >
+                            {item.actionLabel} →
+                          </Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-slate-100 mx-5" />
+
+              {/* ── Hoạt động gần đây ── */}
+              <div className="px-5 pt-4 pb-5">
+                <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">
+                  Hoạt động gần đây
+                </span>
+
+                {historyItems.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">
+                    Chưa có hoạt động nào được ghi nhận.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {historyItems.map((item) => {
+                      const c = ACT_COLORS[item.colorScheme] ?? ACT_COLORS.slate;
+                      const dateStr = formatActDate(item.date);
+                      const isSuccess = item.colorScheme === "green" || item.colorScheme === "emerald" || item.colorScheme === "teal";
+                      return (
+                        <div key={item.id} className={`flex items-start gap-3 p-3 rounded-xl border ${c.bg} ${c.border}`}>
+                          <span className={`mt-0.5 shrink-0 ${c.icon}`}>
+                            {isSuccess
+                              ? <CheckCircle className="w-4 h-4" strokeWidth={2} />
+                              : item.colorScheme === "blue"
+                              ? <Clock className="w-4 h-4" strokeWidth={2} />
+                              : <DollarSign className="w-4 h-4" strokeWidth={2} />}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[13px] font-medium leading-snug ${c.title}`}>{item.title}</p>
                             {item.description && (
                               <p className={`text-xs mt-0.5 leading-relaxed ${c.desc}`}>{item.description}</p>
                             )}
-                            {dateStr && (
-                              <p className="text-xs text-slate-400 mt-1">{dateStr}</p>
-                            )}
+                            {dateStr && <p className="text-[11px] text-slate-400 mt-1">{dateStr}</p>}
                           </div>
                           {item.actionLabel && item.actionHref && (
                             <Link
@@ -771,8 +856,7 @@ export default function SupplierDashboardPage() {
                       );
                     })}
                   </div>
-                );
-              })()}
+                )}
               </div>
             </div>
           </div>

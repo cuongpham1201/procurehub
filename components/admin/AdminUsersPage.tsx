@@ -6,11 +6,11 @@ import {
   getAdminUsers,
   saveAdminUser,
   generateUserId,
-  getInternalSession,
   MOCK_ADMIN,
   INTERNAL_DEFAULT_PASSWORD,
   resetInternalPassword,
 } from "@/services/authStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   getAccounts,
   updateAccount,
@@ -488,14 +488,14 @@ type NccModal =
   | { type: "reset"; account: SupplierAccount };
 
 export default function AdminUsersPage() {
-  const initialSession = getInternalSession();
+  const { user: currentUser } = useCurrentUser();
   const [activeTab, setActiveTab] = useState<ActiveTab>("internal");
-  const [canManage] = useState(() => canManageUsers(initialSession?.role || "Chỉ xem"));
+  const canManage = canManageUsers(currentUser?.role ?? "Chỉ xem");
   const [successMsg, setSuccessMsg] = useState("");
 
   // ── Internal tab state ─────────────────────────────────────────────────
   const [allUsers, setAllUsers] = useState<InternalUser[]>([]);
-  const [currentUserId] = useState<string | null>(() => initialSession?.id ?? null);
+  const currentUserId = currentUser?.id ?? null;
   const [intSearch, setIntSearch] = useState("");
   const [intRoleFilter, setIntRoleFilter] = useState("");
   const [intStatusFilter, setIntStatusFilter] = useState("");

@@ -5,9 +5,13 @@ import {
   logActivitySafe,
   snapshot,
 } from "@/lib/activity-log";
+import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
+import { NotificationType } from "@/lib/notifications/types";
 import { listTenders, upsertTender } from "@/lib/repositories/procurehub";
 import type { AdminTender } from "@/types/adminTender";
 import type { ActivityAction } from "@/types/activityLog";
+
+const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +55,23 @@ export async function POST(request: Request) {
       oldValues: snapshot(previous),
       newValues: snapshot(saved),
     });
+    if (action === "created") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.TENDER_CREATED,
+        title: "Gói thầu mới được tạo",
+        message: `Gói thầu "${saved.title}" (${saved.code ?? ""}) vừa được tạo, chờ phê duyệt đăng.`,
+        link: `/admin/tenders/${saved.id}`,
+        metadata: { tenderId: saved.id, tenderCode: saved.code, tenderTitle: saved.title },
+      });
+    } else if (action === "published") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.TENDER_PUBLISHED,
+        title: "Gói thầu đã được đăng",
+        message: `Gói thầu "${saved.title}" (${saved.code ?? ""}) hiện đang mở. Nhà cung cấp có thể nộp báo giá.`,
+        link: `/admin/tenders/${saved.id}`,
+        metadata: { tenderId: saved.id, tenderCode: saved.code, tenderTitle: saved.title },
+      });
+    }
     return ok(saved);
   } catch (error) {
     return fail(error);

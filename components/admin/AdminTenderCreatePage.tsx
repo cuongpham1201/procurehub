@@ -12,7 +12,7 @@ import {
   getMaterialItems,
   getPurchaseCategories,
 } from "@/services/categoryStorage";
-import { getInternalSession } from "@/services/authStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { getTodayDateString, isDateTodayOrFuture, toDateInputValue } from "@/services/dateUtils";
 import QuickMaterialModal from "@/components/admin/QuickMaterialModal";
 import type {
@@ -178,6 +178,8 @@ function SuccessState({ tender }: { tender: AdminTender }) {
 // ── main component ────────────────────────────────────────────────────────
 
 export default function AdminTenderCreatePage() {
+  const { user: currentUser } = useCurrentUser();
+  const role = currentUser?.role ?? "Chỉ xem";
   const [form, setForm] = useState<FormState>({
     title: "",
     category: "",
@@ -194,7 +196,6 @@ export default function AdminTenderCreatePage() {
   const [materialItems, setMaterialItems] = useState<MaterialItem[]>([]);
   const [saved, setSaved] = useState<AdminTender | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [role, setRole] = useState("Chỉ xem");
   const [quickMaterialRow, setQuickMaterialRow] = useState<number | null>(null);
   const [quickMaterialError, setQuickMaterialError] = useState("");
 
@@ -205,7 +206,6 @@ export default function AdminTenderCreatePage() {
       const activeCategories = categories.filter((category) => category.status === "Hoạt động");
       setPurchaseCategories(activeCategories);
       setMaterialItems(materials);
-      setRole(getInternalSession()?.role || "Chỉ xem");
       setForm((prev) => {
         if (prev.category && activeCategories.some((category) => category.name === prev.category || category.code === prev.category)) {
           return prev;

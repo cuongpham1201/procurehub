@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { deleteTender, getAdminTenderById, reopenTender, saveAdminTender, updateAdminTenderStatus, ensureTenderSeedData } from "@/services/tenderStorage";
 import { getBids } from "@/services/supplierBidStorage";
-import { getInternalSession } from "@/services/authStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   ensureCategorySeedData,
   getMaterialItems,
@@ -157,10 +157,11 @@ function tenderToEditForm(t: AdminTender): EditForm {
 
 export default function AdminTenderDetailPage({ id }: { id: string }) {
   const router = useRouter();
+  const { user: currentUser } = useCurrentUser();
   const [tender, setTender] = useState<AdminTender | null | undefined>(undefined);
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [successMsg, setSuccessMsg] = useState("");
-  const [role, setRole] = useState("Chỉ xem");
+  const role = currentUser?.role ?? "Chỉ xem";
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<EditForm | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -189,8 +190,6 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
       const code = found?.code ?? "";
       setBids(allBids.filter((b) => b.tenderId === id || b.tenderCode === code));
 
-      const session = getInternalSession();
-      setRole(session?.role || "Chỉ xem");
     }
     loadData();
   }, [id]);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getCurrentSession } from "@/services/supplierAccountStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { getBidsBySupplier } from "@/services/supplierBidStorage";
 import type { SupplierBid, BidItem } from "@/types/supplierBid";
 
@@ -134,24 +134,23 @@ function NotLoggedIn() {
 
 // ── main component ─────────────────────────────────────────────────────────
 export default function SupplierBidsPage() {
+  const { user: session, loading: sessionLoading } = useCurrentUser();
   const [bids, setBids] = useState<SupplierBid[]>([]);
-  const [companyName, setCompanyName] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const loggedIn = !sessionLoading && session?.kind === "supplier";
+  const companyName = session?.name ?? "";
 
   useEffect(() => {
+    if (sessionLoading) return;
     async function loadData() {
-      const session = getCurrentSession();
-      if (!session) { setLoading(false); return; }
-      setLoggedIn(true);
-      setCompanyName(session.companyName);
+      if (!session || session.kind !== "supplier") { setLoading(false); return; }
       const myBids = await getBidsBySupplier(session.id);
       setBids(myBids.slice().sort((a, b) => (bidDate(b)).localeCompare(bidDate(a))));
       setLoading(false);
     }
     loadData();
-  }, []);
+  }, [session, sessionLoading]);
 
   if (loading) {
     return (

@@ -5,9 +5,13 @@ import {
   logActivitySafe,
   snapshot,
 } from "@/lib/activity-log";
+import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
+import { NotificationType } from "@/lib/notifications/types";
 import { deleteTenderRecord, getTender, upsertTender } from "@/lib/repositories/procurehub";
 import type { AdminTender } from "@/types/adminTender";
 import type { ActivityAction } from "@/types/activityLog";
+
+const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +57,31 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       oldValues: snapshot(previous),
       newValues: snapshot(saved),
     });
+    if (action === "published") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.TENDER_PUBLISHED,
+        title: "Gói thầu đã được đăng",
+        message: `Gói thầu "${saved.title}" (${saved.code ?? ""}) hiện đang mở nhận báo giá.`,
+        link: `/admin/tenders/${saved.id}`,
+        metadata: { tenderId: saved.id, tenderCode: saved.code },
+      });
+    } else if (action === "closed") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.TENDER_CLOSED,
+        title: "Gói thầu đã đóng",
+        message: `Gói thầu "${saved.title}" (${saved.code ?? ""}) đã đóng nhận báo giá. Có thể tiến hành đánh giá.`,
+        link: `/admin/tenders/${saved.id}`,
+        metadata: { tenderId: saved.id, tenderCode: saved.code },
+      });
+    } else if (action === "cancelled") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.TENDER_CANCELLED,
+        title: "Gói thầu đã hủy",
+        message: `Gói thầu "${saved.title}" (${saved.code ?? ""}) đã bị hủy.`,
+        link: `/admin/tenders/${saved.id}`,
+        metadata: { tenderId: saved.id, tenderCode: saved.code },
+      });
+    }
     return ok(saved);
   } catch (error) {
     return fail(error);

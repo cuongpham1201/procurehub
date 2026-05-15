@@ -3,11 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  getCurrentSession,
-  updateAccount,
-  setCurrentSession,
-} from "@/services/supplierAccountStorage";
+import { updateAccount } from "@/services/supplierAccountStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
 
 // ── icons ──────────────────────────────────────────────────────────────────
@@ -95,6 +92,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 // ── main component ─────────────────────────────────────────────────────────
 export default function SupplierProfilePage() {
   const router = useRouter();
+  const { user: session, loading: sessionLoading } = useCurrentUser();
   const [account, setAccount] = useState<SupplierAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -112,25 +110,31 @@ export default function SupplierProfilePage() {
   });
 
   useEffect(() => {
-    const session = getCurrentSession();
-    if (!session) {
+    if (sessionLoading) return;
+    if (!session || session.kind !== "supplier") {
       router.replace("/login");
       return;
     }
-    setAccount(session);
-    // Pre-fill from existing profile data
-    setForm({
-      address: session.address ?? "",
-      province: session.province ?? "",
-      website: session.website ?? "",
-      businessDescription: session.businessDescription ?? "",
-      categories: session.categories ?? [],
-      hotline: session.hotline ?? "",
-      rfqEmail: session.rfqEmail ?? "",
-      quotationContact: session.quotationContact ?? "",
-    });
-    setLoading(false);
-  }, [router]);
+    fetch(`/api/suppliers/${session.id}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((envelope) => {
+        // API trả { data: {...}, error: null } — phải unwrap .data
+        const supplier = envelope?.data ?? envelope;
+        if (!supplier || !supplier.id) return;
+        setAccount(supplier);
+        setForm({
+          address: supplier.address ?? "",
+          province: supplier.province ?? "",
+          website: supplier.website ?? "",
+          businessDescription: supplier.businessDescription ?? "",
+          categories: supplier.categories ?? [],
+          hotline: supplier.hotline ?? "",
+          rfqEmail: supplier.rfqEmail ?? "",
+          quotationContact: supplier.quotationContact ?? "",
+        });
+        setLoading(false);
+      });
+  }, [session, sessionLoading, router]);
 
   if (loading) {
     return (
@@ -182,14 +186,21 @@ export default function SupplierProfilePage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    // Không bao giờ gửi companyName rỗng — guard trước khi gọi API
+    if (!account.companyName?.trim()) {
+      setErrors((prev) => ({ ...prev, address: "Không tìm thấy tên công ty. Vui lòng tải lại trang." }));
+      return;
+    }
     const updated: SupplierAccount = {
       ...account,
       ...form,
+      // Đảm bảo các field định danh từ DB không bị form ghi đè
+      companyName: account.companyName,
+      taxCode: account.taxCode,
       profileCompleted: true,
       status: "Chờ xét duyệt",
     };
     await updateAccount(updated);
-    setCurrentSession(updated);
     setAccount(updated);
     setSaved(true);
     window.scrollTo({ top: 0, behavior: "smooth" });

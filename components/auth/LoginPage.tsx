@@ -4,17 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  findByCredentials,
-  setCurrentSession,
-  clearSession,
-} from "@/services/supplierAccountStorage";
-import {
-  findInternalByCredentials,
-  setInternalSession,
-  clearInternalSession,
-} from "@/services/authStorage";
-import { AlertCircle, Eye, EyeOff, ArrowLeft, Shield, Clock, Users } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, ArrowLeft, Shield, Clock, Users, Lock } from "lucide-react";
 
 type Tab = "supplier" | "internal";
 
@@ -30,17 +20,33 @@ function inputCls(hasError: boolean) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab,      setTab]      = useState<Tab>("supplier");
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [error,    setError]    = useState("");
-  const [loading,  setLoading]  = useState(false);
+  const [tab,       setTab]       = useState<Tab>("supplier");
+  const [email,     setEmail]     = useState("");
+  const [password,  setPassword]  = useState("");
+  const [showPw,    setShowPw]    = useState(false);
+  const [error,     setError]     = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("type") === "internal") setTab("internal");
+    if (params.get("error") === "forbidden") {
+      setForbidden(true);
+      // Auto-switch to the correct tab for the destination
+      const next = params.get("next") ?? "";
+      setTab(next.startsWith("/admin") ? "internal" : "supplier");
+    } else if (params.get("type") === "internal") {
+      setTab("internal");
+    }
   }, []);
+
+  async function handleLogoutAndSwitch() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setForbidden(false);
+    setError("");
+    setEmail("");
+    setPassword("");
+  }
 
   function switchTab(next: Tab) {
     setTab(next);
@@ -58,21 +64,28 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      if (tab === "supplier") {
-        const account = await findByCredentials(email.trim(), password);
-        if (!account) { setError("Email hoặc mật khẩu không đúng."); return; }
-        if (account.status === "Tạm khóa") { setError("Tài khoản đang bị tạm khóa. Liên hệ quản trị viên."); return; }
-        clearInternalSession();
-        setCurrentSession(account);
-        router.push(account.profileCompleted ? "/supplier/dashboard" : "/supplier/profile");
-      } else {
-        const user = await findInternalByCredentials(email.trim(), password);
-        if (!user) { setError("Email hoặc mật khẩu nội bộ không đúng."); return; }
-        if (user.status === "Tạm khóa") { setError("Tài khoản nội bộ đang bị tạm khóa."); return; }
-        clearSession();
-        setInternalSession(user);
-        router.push("/admin");
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password, kind: tab === "internal" ? "internal" : "supplier" }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Đăng nhập thất bại.");
+        return;
       }
+
+      const nextParam = new URLSearchParams(window.location.search).get("next");
+
+      if (data.kind === "supplier") {
+        router.push(nextParam ?? "/supplier/dashboard");
+      } else {
+        router.push(nextParam ?? "/admin");
+      }
+    } catch {
+      setError("Lỗi kết nối. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -272,6 +285,34 @@ export default function LoginPage() {
                 </button>
               ))}
             </div>
+
+            {/* Forbidden banner — shown when logged in with wrong role */}
+            {forbidden && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <Lock className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-800 mb-0.5">Không có quyền truy cập</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      Tài khoản hiện tại không có quyền truy cập trang này. Vui lòng đăng nhập bằng tài khoản{" "}
+                      {tab === "internal" ? "nội bộ Bia Hạ Long" : "nhà cung cấp"} để tiếp tục.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogoutAndSwitch}
+                  className="mt-3 w-full py-2 rounded-lg text-xs font-semibold border transition-colors"
+                  style={{ borderColor: "var(--brand-accent)", color: "var(--brand-accent)", background: "transparent" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(201,162,39,0.07)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+                >
+                  Đăng xuất và đăng nhập tài khoản khác
+                </button>
+              </div>
+            )}
 
             {/* Login card */}
             <div className="bg-white rounded-2xl border border-[var(--border-default)] shadow-sm p-7">

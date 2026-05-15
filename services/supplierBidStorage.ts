@@ -13,6 +13,10 @@ export async function saveBid(bid: SupplierBid): Promise<void> {
   await apiPost<SupplierBid>("/api/bids", bid);
 }
 
+export async function updateBid(bid: SupplierBid): Promise<void> {
+  await apiPut<SupplierBid>(`/api/bids/${encodeURIComponent(bid.id)}`, bid);
+}
+
 export async function getBidById(id: string): Promise<SupplierBid | undefined> {
   return (await getBids()).find((b) => b.id === id);
 }

@@ -6,9 +6,13 @@ import {
   snapshot,
   withActorFallback,
 } from "@/lib/activity-log";
+import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
+import { NotificationType } from "@/lib/notifications/types";
 import { getSupplier, listSuppliers, upsertSupplier } from "@/lib/repositories/procurehub";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { ActivityAction } from "@/types/activityLog";
+
+const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +61,15 @@ export async function POST(request: Request) {
       oldValues: snapshot(previous),
       newValues: snapshot(saved),
     });
+    if (action === "created") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.SUPPLIER_REGISTERED,
+        title: "Nhà cung cấp mới đăng ký",
+        message: `${saved.companyName} vừa đăng ký tài khoản nhà cung cấp. Cần xét duyệt hồ sơ.`,
+        link: `/admin/suppliers/${saved.id}`,
+        metadata: { supplierId: saved.id, supplierName: saved.companyName },
+      });
+    }
     return ok(saved);
   } catch (error) {
     return fail(error);

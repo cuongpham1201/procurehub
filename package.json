@@ -7,11 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "psql \"$DATABASE_URL\" -f database/migrations/001_init_procurehub.sql && psql \"$DATABASE_URL\" -f database/migrations/002_add_activity_logs.sql",
+    "db:migrate": "psql \"$DATABASE_URL\" -f database/migrations/001_init_procurehub.sql && psql \"$DATABASE_URL\" -f database/migrations/002_add_activity_logs.sql && psql \"$DATABASE_URL\" -f database/migrations/003_auth_columns.sql",
+    "db:migrate:auth": "node --env-file=.env.local scripts/run-migration-003.mjs",
+    "db:migrate:notifications": "node --env-file=.env.local scripts/run-migration-004.mjs",
     "db:import-local": "node scripts/import-localstorage-to-postgres.mjs",
     "seed:demo": "node scripts/seed-demo-data.mjs"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.3",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
     "pg": "^8.20.0",

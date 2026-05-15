@@ -3,6 +3,7 @@ export type BidStatus =
   | "Chờ xem xét"
   | "Đang đánh giá"
   | "Cần bổ sung"
+  | "Đã bổ sung"
   | "Được chọn"
   | "Không được chọn";
 

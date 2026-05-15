@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getInternalSession, clearAllSessions } from "@/services/authStorage";
-import type { InternalUser } from "@/types/internalUser";
-import { Menu, ChevronRight, LogOut, User, Home, Bell } from "lucide-react";
+import { useCurrentUser, logout } from "@/hooks/useCurrentUser";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import { Menu, ChevronRight, LogOut, User, Home } from "lucide-react";
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -79,18 +79,9 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const breadcrumbs = getBreadcrumbs(pathname);
   const pageTitle = getPageTitle(pathname);
 
-  const [user, setUser] = useState<InternalUser | null>(null);
-  const [checked, setChecked] = useState(false);
+  const { user, loading } = useCurrentUser();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      setUser(getInternalSession());
-      setChecked(true);
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -102,14 +93,15 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  function handleLogout() {
-    clearAllSessions();
+  async function handleLogout() {
+    await logout();
     router.push("/");
+    router.refresh();
   }
 
-  const displayName = user?.fullName ?? (user as { name?: string } | null)?.name ?? "Admin";
-  const displayRole = user?.role ?? (checked ? "Demo" : "...");
-  const isDemo = checked && !user;
+  const displayName = user?.name ?? "Admin";
+  const displayRole = user?.role ?? (loading ? "..." : "Demo");
+  const isDemo = !loading && !user;
   const initials = getInitials(displayName);
 
   return (
@@ -174,14 +166,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
           <Home className="w-4 h-4" />
         </Link>
 
-        {/* Notification bell – placeholder */}
-        <button
-          title="Thông báo"
-          className="relative flex items-center justify-center w-8 h-8 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full" />
-        </button>
+        <NotificationBell variant="admin" />
 
         {/* Divider */}
         <div className="w-px h-5 bg-slate-200 mx-1" />

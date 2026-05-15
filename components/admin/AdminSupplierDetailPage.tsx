@@ -5,8 +5,7 @@ import { useEffect, useState } from "react";
 import { getAccounts, updateAccount } from "@/services/supplierAccountStorage";
 import { normalizePhone } from "@/services/supplierAccountStorage";
 import { getBids } from "@/services/supplierBidStorage";
-import { getInternalSession } from "@/services/authStorage";
-import { getCurrentSession, setCurrentSession } from "@/services/supplierAccountStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { SupplierBid } from "@/types/supplierBid";
 
@@ -140,10 +139,11 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1";
 // ── main component ────────────────────────────────────────────────────────
 
 export default function AdminSupplierDetailPage({ id }: { id: string }) {
+  const { user: currentUser } = useCurrentUser();
+  const role = currentUser?.role ?? "Chỉ xem";
   const [account, setAccount] = useState<SupplierAccount | null | undefined>(undefined);
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [successMsg, setSuccessMsg] = useState("");
-  const [role, setRole] = useState("Chỉ xem");
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<EditForm | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -154,8 +154,6 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
       const found = all.find((a) => a.id === id) ?? null;
       setAccount(found);
       setBids(allBids.filter((b) => b.supplierId === id));
-      const session = getInternalSession();
-      setRole(session?.role || "Chỉ xem");
     }
     loadData();
   }, [id]);
@@ -255,11 +253,6 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
     await updateAccount(updated);
     setAccount(updated);
 
-    // Sync supplier session if they're the same person
-    const supplierSession = getCurrentSession();
-    if (supplierSession?.id === id) {
-      setCurrentSession(updated);
-    }
 
     setIsEditing(false);
     setForm(null);

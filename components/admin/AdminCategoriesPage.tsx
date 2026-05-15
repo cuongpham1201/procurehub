@@ -12,7 +12,7 @@ import {
   updateMaterialItem,
   updatePurchaseCategory,
 } from "@/services/categoryStorage";
-import { getInternalSession } from "@/services/authStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { CatalogStatus, MaterialItem, PurchaseCategory } from "@/types/category";
 
 type Tab = "categories" | "materials";
@@ -93,10 +93,11 @@ function SummaryCard({
 }
 
 export default function AdminCategoriesPage() {
+  const { user: currentUser } = useCurrentUser();
   const [tab, setTab] = useState<Tab>("categories");
   const [categories, setCategories] = useState<PurchaseCategory[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
-  const [role, setRole] = useState("Chỉ xem");
+  const role = currentUser?.role ?? "Chỉ xem";
   const [categorySearch, setCategorySearch] = useState("");
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialCategoryFilter, setMaterialCategoryFilter] = useState("");
@@ -120,7 +121,6 @@ export default function AdminCategoriesPage() {
   useEffect(() => {
     ensureCategorySeedData();
     reloadData();
-    setRole(getInternalSession()?.role || "Chỉ xem");
   }, []);
 
   const materialCountByCategory = useMemo(() => {

@@ -6,9 +6,14 @@ import {
   snapshot,
   withActorFallback,
 } from "@/lib/activity-log";
+import { getServerSession } from "@/lib/auth/server";
+import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
+import { NotificationType } from "@/lib/notifications/types";
 import { getBid, listBids, upsertBid } from "@/lib/repositories/procurehub";
 import type { SupplierBid } from "@/types/supplierBid";
 import type { ActivityAction } from "@/types/activityLog";
+
+const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +26,25 @@ function resolveBidAction(previous: SupplierBid | null, current: SupplierBid): A
   return "updated";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return ok(await listBids());
+    const session = await getServerSession();
+    const url = new URL(request.url);
+    const tenderId = url.searchParams.get("tenderId") ?? undefined;
+
+    let bids = await listBids();
+
+    // Security: suppliers may only see their own bids — never other suppliers' data
+    if (session?.kind === "supplier") {
+      bids = bids.filter((b) => b.supplierId === session.sub);
+    }
+
+    // Optional tender filter (used by public tender detail page)
+    if (tenderId) {
+      bids = bids.filter((b) => b.tenderId === tenderId || b.tenderCode === tenderId);
+    }
+
+    return ok(bids);
   } catch (error) {
     return fail(error);
   }
@@ -60,6 +81,15 @@ export async function POST(request: Request) {
       oldValues: snapshot(previous),
       newValues: snapshot(saved),
     });
+    if (action === "submitted") {
+      await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
+        type: NotificationType.BID_SUBMITTED,
+        title: "Báo giá mới được nộp",
+        message: `${saved.supplierName} vừa nộp báo giá cho gói thầu ${saved.tenderCode ?? saved.tenderTitle}.`,
+        link: `/admin/bids/${saved.id}`,
+        metadata: { bidId: saved.id, bidCode: saved.bidCode, supplierId: saved.supplierId, tenderCode: saved.tenderCode },
+      });
+    }
     return ok(saved);
   } catch (error) {
     return fail(error);

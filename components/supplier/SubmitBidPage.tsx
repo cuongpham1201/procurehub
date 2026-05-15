@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getCurrentSession, getAccounts } from "@/services/supplierAccountStorage";
-import { getBidsBySupplier, saveBid, generateBidCode, generateBidId } from "@/services/supplierBidStorage";
+import { getAccounts } from "@/services/supplierAccountStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { getBidsBySupplier, saveBid, updateBid, generateBidCode, generateBidId } from "@/services/supplierBidStorage";
 import { ensureTenderSeedData, getAdminTenderById, adminToPublicTender } from "@/services/tenderStorage";
 import { isDateTodayOrFuture } from "@/services/dateUtils";
 import type { SupplierAccount } from "@/types/supplierAccount";
@@ -235,10 +236,14 @@ function SuccessState({ tender, bidCode }: { tender: Tender; bidCode: string }) 
 export default function SubmitBidPage() {
   const searchParams = useSearchParams();
   const tenderId = searchParams.get("tenderId") ?? "";
+  const editBidId = searchParams.get("edit") ?? "";
+  const isEditMode = editBidId.length > 0;
+  const { user: session, loading: sessionLoading } = useCurrentUser();
 
   const [account, setAccount] = useState<SupplierAccount | null>(null);
   const [adminTender, setAdminTender] = useState<AdminTender | null>(null);
   const [tender, setTender] = useState<Tender | null>(null);
+  const [editingBid, setEditingBid] = useState<SupplierBid | null>(null);
   const [loading, setLoading] = useState(true);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [savedBidCode, setSavedBidCode] = useState<string | null>(null);
@@ -255,30 +260,66 @@ export default function SubmitBidPage() {
   const [globalError, setGlobalError] = useState("");
 
   useEffect(() => {
+    if (sessionLoading) return;
     async function loadData() {
       ensureTenderSeedData();
-      const session = getCurrentSession();
-      if (session) {
+      if (session && session.kind === "supplier") {
         const accounts = await getAccounts();
-        const fresh = accounts.find((a) => a.id === session.id) ?? session;
-        setAccount(fresh);
+        setAccount(accounts.find((a) => a.id === session.id) ?? null);
       } else {
         setAccount(null);
       }
+
       const found = await getAdminTenderById(tenderId);
       if (found) {
         setAdminTender(found);
         setTender(adminToPublicTender(found));
-        setItemForms(found.items.map(() => ({ unitPrice: "", brand: "", origin: "", note: "" })));
-        if (session) {
-          const existing = (await getBidsBySupplier(session.id)).find((b) => b.tenderId === found.id);
-          if (existing) setAlreadySubmitted(true);
+
+        if (isEditMode && session && session.kind === "supplier") {
+          // Fetch bid by id and preload form nếu status là "Cần bổ sung"
+          try {
+            const res = await fetch(`/api/bids/${encodeURIComponent(editBidId)}`);
+            if (res.ok) {
+              const { data: bidData } = (await res.json()) as { data: SupplierBid | null };
+              if (bidData && bidData.status === "Cần bổ sung" && bidData.supplierId === session.id) {
+                setEditingBid(bidData);
+                setHeader({
+                  deliveryTime: bidData.deliveryTime ?? "",
+                  paymentTerms: bidData.paymentTerms ?? "",
+                  warrantyPolicy: bidData.warrantyPolicy ?? "",
+                  note: bidData.note ?? "",
+                });
+                setItemForms(found.items.map((tItem) => {
+                  const bi = (bidData.items ?? []).find((b) => b.tenderItemId === tItem.id);
+                  return {
+                    unitPrice: bi?.unitPrice ? String(bi.unitPrice) : "",
+                    brand: bi?.brand ?? "",
+                    origin: bi?.origin ?? "",
+                    note: bi?.note ?? "",
+                  };
+                }));
+              } else {
+                // Bid không hợp lệ để edit → fallback về AlreadySubmitted
+                setAlreadySubmitted(true);
+                setItemForms(found.items.map(() => ({ unitPrice: "", brand: "", origin: "", note: "" })));
+              }
+            }
+          } catch {
+            setItemForms(found.items.map(() => ({ unitPrice: "", brand: "", origin: "", note: "" })));
+          }
+        } else {
+          // Normal mode: check existing bid
+          setItemForms(found.items.map(() => ({ unitPrice: "", brand: "", origin: "", note: "" })));
+          if (session && session.kind === "supplier") {
+            const existing = (await getBidsBySupplier(session.id)).find((b) => b.tenderId === found.id);
+            if (existing) setAlreadySubmitted(true);
+          }
         }
       }
       setLoading(false);
     }
     loadData();
-  }, [tenderId]);
+  }, [tenderId, editBidId, isEditMode, session, sessionLoading]);
 
   if (loading) {
     return (
@@ -306,14 +347,16 @@ export default function SubmitBidPage() {
   const supplierStatus = normalizeSupplierStatus(account);
   if (supplierStatus !== "Đã duyệt") return <NotApproved status={supplierStatus} />;
 
-  if (alreadySubmitted) return <AlreadySubmitted tender={tender} />;
+  // Chỉ chặn nếu không phải edit mode hợp lệ
+  if (alreadySubmitted && !editingBid) return <AlreadySubmitted tender={tender} />;
   if (savedBidCode) return <SuccessState tender={tender} bidCode={savedBidCode} />;
 
   const isDeadlineActive = isDateTodayOrFuture(adminTender.deadline);
   const isReceivingBids = adminTender.status === "Đang mở" || adminTender.status === "Sắp đóng";
   const canSubmitBid = isReceivingBids && isDeadlineActive;
 
-  if (!canSubmitBid) {
+  // Trong edit mode ("Cần bổ sung"), cho phép kể cả khi tender đã đóng/hết hạn
+  if (!canSubmitBid && !editingBid) {
     return (
       <div className="min-h-screen bg-slate-50">
         <PublicHeader />
@@ -363,18 +406,22 @@ export default function SubmitBidPage() {
       setGlobalError("Tài khoản chưa được duyệt. Không thể nộp báo giá.");
       return;
     }
-    const freshTender = await getAdminTenderById(adminTender.id);
-    const freshTenderReceivingBids =
-      freshTender?.status === "Đang mở" || freshTender?.status === "Sắp đóng";
-    if (!freshTender || !freshTenderReceivingBids || !isDateTodayOrFuture(freshTender.deadline)) {
-      setGlobalError(
-        freshTender && !isDateTodayOrFuture(freshTender.deadline)
-          ? "Gói thầu đã hết hạn nộp báo giá."
-          : "Gói thầu này đã đóng, không còn nhận báo giá."
-      );
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+
+    // Chỉ check tender open/close khi submit mới (không phải edit "Cần bổ sung")
+    if (!editingBid) {
+      const freshTender = await getAdminTenderById(adminTender.id);
+      const freshTenderOk = freshTender?.status === "Đang mở" || freshTender?.status === "Sắp đóng";
+      if (!freshTender || !freshTenderOk || !isDateTodayOrFuture(freshTender.deadline)) {
+        setGlobalError(
+          freshTender && !isDateTodayOrFuture(freshTender.deadline)
+            ? "Gói thầu đã hết hạn nộp báo giá."
+            : "Gói thầu này đã đóng, không còn nhận báo giá.",
+        );
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
     }
+
     const hErrs: Partial<Record<keyof HeaderForm, string>> = {};
     if (!header.deliveryTime.trim()) hErrs.deliveryTime = "Vui lòng nhập thời gian giao hàng.";
     if (!header.paymentTerms.trim()) hErrs.paymentTerms = "Vui lòng nhập điều kiện thanh toán.";
@@ -416,27 +463,46 @@ export default function SubmitBidPage() {
     });
 
     const total = bidItems.reduce((s, item) => s + item.amount, 0);
-    const bidCode = await generateBidCode();
-    const bid: SupplierBid = {
-      id: generateBidId(),
-      bidCode,
-      tenderId: tender.id,
-      tenderCode: tender.code,
-      tenderTitle: tender.name,
-      supplierId: account.id,
-      supplierName: account.companyName,
-      supplierEmail: account.email,
-      status: "Đã nộp",
-      submittedAt: new Date().toISOString(),
-      totalAmount: total,
-      deliveryTime: header.deliveryTime.trim() || undefined,
-      paymentTerms: header.paymentTerms.trim() || undefined,
-      warrantyPolicy: header.warrantyPolicy.trim() || undefined,
-      note: header.note.trim() || undefined,
-      items: bidItems,
-    };
-    await saveBid(bid);
-    setSavedBidCode(bidCode);
+
+    if (editingBid) {
+      // Edit mode: PUT bid hiện có với status "Đã bổ sung"
+      const updated: SupplierBid = {
+        ...editingBid,
+        status: "Đã bổ sung",
+        submittedAt: new Date().toISOString(),
+        totalAmount: total,
+        deliveryTime: header.deliveryTime.trim() || undefined,
+        paymentTerms: header.paymentTerms.trim() || undefined,
+        warrantyPolicy: header.warrantyPolicy.trim() || undefined,
+        note: header.note.trim() || undefined,
+        items: bidItems,
+      };
+      await updateBid(updated);
+      setSavedBidCode(editingBid.bidCode);
+    } else {
+      // Submit mới
+      const bidCode = await generateBidCode();
+      const bid: SupplierBid = {
+        id: generateBidId(),
+        bidCode,
+        tenderId: tender.id,
+        tenderCode: tender.code,
+        tenderTitle: tender.name,
+        supplierId: account.id,
+        supplierName: account.companyName,
+        supplierEmail: account.email,
+        status: "Đã nộp",
+        submittedAt: new Date().toISOString(),
+        totalAmount: total,
+        deliveryTime: header.deliveryTime.trim() || undefined,
+        paymentTerms: header.paymentTerms.trim() || undefined,
+        warrantyPolicy: header.warrantyPolicy.trim() || undefined,
+        note: header.note.trim() || undefined,
+        items: bidItems,
+      };
+      await saveBid(bid);
+      setSavedBidCode(bidCode);
+    }
   }
 
   return (
@@ -453,9 +519,13 @@ export default function SubmitBidPage() {
               {tender.code}
             </Link>
             <span>›</span>
-            <span className="text-slate-600 font-medium">Nộp báo giá</span>
+            <span className="text-slate-600 font-medium">
+              {isEditMode ? "Cập nhật báo giá" : "Nộp báo giá"}
+            </span>
           </div>
-          <h1 className="text-xl font-bold text-[#0f2d5e]">Nộp báo giá</h1>
+          <h1 className="text-xl font-bold text-[#0f2d5e]">
+            {isEditMode ? "Cập nhật báo giá" : "Nộp báo giá"}
+          </h1>
           <p className="text-sm text-slate-500 mt-1 line-clamp-1">{tender.name}</p>
         </div>
       </div>
@@ -465,6 +535,19 @@ export default function SubmitBidPage() {
 
           {/* ── Form ─────────────────────────────────────────────────────── */}
           <div className="lg:col-span-2 flex flex-col gap-5">
+
+            {/* Banner cảnh báo khi edit "Cần bổ sung" */}
+            {isEditMode && editingBid && (
+              <div className="flex gap-3 items-start bg-orange-50 border border-orange-200 text-orange-800 rounded-xl p-4 text-sm">
+                <IconAlert />
+                <div>
+                  <p className="font-semibold mb-0.5">Báo giá cần bổ sung thông tin</p>
+                  <p className="text-xs text-orange-700">
+                    Phòng mua sắm yêu cầu bổ sung thông tin trước khi phê duyệt. Vui lòng cập nhật và gửi lại báo giá.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {globalError && (
               <div className="flex gap-3 items-start bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
@@ -656,13 +739,19 @@ export default function SubmitBidPage() {
               )}
             </div>
 
-            <form onSubmit={handleSubmit} noValidate>
+            <form onSubmit={handleSubmit} noValidate className="flex flex-col sm:flex-row gap-3">
               <button
                 type="submit"
-                className="w-full bg-[#c9a227] hover:bg-[#b8960c] text-[#0f2d5e] font-semibold py-3.5 rounded-xl text-sm transition-colors shadow-sm"
+                className="flex-1 bg-[#c9a227] hover:bg-[#b8960c] text-[#0f2d5e] font-semibold py-3.5 rounded-xl text-sm transition-colors shadow-sm"
               >
-                Nộp báo giá
+                {isEditMode ? "Gửi lại báo giá" : "Nộp báo giá"}
               </button>
+              <Link
+                href={`/tenders/${tender.id}`}
+                className="flex-1 text-center border border-[#0f2d5e]/30 text-[#0f2d5e] hover:bg-[#0f2d5e]/5 font-semibold py-3.5 rounded-xl text-sm transition-colors"
+              >
+                Quay lại gói thầu
+              </Link>
             </form>
           </div>
 
@@ -700,6 +789,14 @@ export default function SubmitBidPage() {
               </div>
             )}
 
+            {isEditMode && editingBid && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-xs text-orange-800">
+                <p className="font-semibold mb-1">Đang cập nhật báo giá</p>
+                <p className="font-mono text-orange-700">{editingBid.bidCode}</p>
+                <p className="text-orange-600 mt-1">Trạng thái: Cần bổ sung</p>
+              </div>
+            )}
+
             <div className="bg-[#0f2d5e] text-white rounded-2xl p-5">
               <h3 className="font-semibold mb-3 text-[#c9a227] text-sm">Nhà cung cấp</h3>
               <div className="space-y-2 text-sm">
@@ -707,11 +804,6 @@ export default function SubmitBidPage() {
                 <p className="text-xs text-white/60">Mã: <span className="font-mono">{account.id}</span></p>
                 <p className="text-xs text-white/60">{account.email}</p>
               </div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-700">
-              <p className="font-semibold mb-1">Lưu ý (chế độ demo)</p>
-              <p>Báo giá sẽ được lưu trên trình duyệt. Không có dữ liệu nào được gửi lên server.</p>
             </div>
           </div>
         </div>
