@@ -560,7 +560,7 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
               ) : (
                 <div className="border border-red-200 bg-red-50 rounded-lg p-3">
                   <p className="text-xs text-red-700 font-semibold mb-1">Xác nhận xóa báo giá này?</p>
-                  <p className="text-xs text-red-600 mb-3">Thao tác này chỉ áp dụng cho dữ liệu test localStorage.</p>
+                  <p className="text-xs text-red-600 mb-3">Thao tác không thể hoàn tác.</p>
                   <div className="flex gap-2">
                     <button
                       onClick={handleDelete}

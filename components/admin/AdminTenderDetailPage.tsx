@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { deleteTender, getAdminTenderById, reopenTender, saveAdminTender, updateAdminTenderStatus, ensureTenderSeedData } from "@/services/tenderStorage";
+import { getAdminTenderById, reopenTender, saveAdminTender, updateAdminTenderStatus, ensureTenderSeedData } from "@/services/tenderStorage";
 import { getBids } from "@/services/supplierBidStorage";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -230,18 +230,6 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setReopenError("");
     setSuccessMsg("Đã mở thầu lại gói thầu.");
     setTimeout(() => setSuccessMsg(""), 4000);
-  }
-
-  async function handleDeleteTender() {
-    if (!tender || role !== "Admin") return;
-    const hasBids = bids.length > 0;
-    const message = hasBids
-      ? "Gói thầu này đã có báo giá. Nếu xóa, các báo giá liên quan cũng có thể bị mất liên kết. Bạn vẫn muốn xóa dữ liệu test này?"
-      : "Xác nhận xóa gói thầu này? Thao tác này chỉ áp dụng cho dữ liệu test localStorage.";
-    if (!window.confirm(message)) return;
-
-    await deleteTender(tender.id);
-    router.push("/admin/tenders");
   }
 
   function startEdit() {
@@ -925,20 +913,6 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-              {isAdmin && (
-                <div className="bg-white rounded-xl border border-red-200 p-5">
-                  <h3 className="font-semibold text-red-700 text-sm mb-2">Dữ liệu test</h3>
-                  <p className="text-xs text-slate-500 mb-3">
-                    Xóa gói thầu khỏi localStorage và xóa các báo giá liên quan nếu có.
-                  </p>
-                  <button
-                    onClick={handleDeleteTender}
-                    className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    Xóa gói thầu test
-                  </button>
                 </div>
               )}
               {tender.status === "Đang đánh giá" && bids.length > 0 && (

@@ -344,7 +344,7 @@ export default function AdminBidComparisonPage() {
 
           {isResult && (
             <div className="bg-purple-50 border border-purple-200 text-purple-700 rounded-xl px-4 py-3 text-sm">
-              Gói thầu đã có kết quả. Nếu cần thay đổi, vui lòng xử lý thủ công trong dữ liệu test.
+              Gói thầu đã có kết quả. Liên hệ quản trị viên nếu cần điều chỉnh.
             </div>
           )}
 
