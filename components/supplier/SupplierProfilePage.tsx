@@ -190,7 +190,9 @@ export default function SupplierProfilePage() {
       companyName: account.companyName,
       taxCode: account.taxCode,
       profileCompleted: true,
-      status: "Chờ xét duyệt",
+      // Giữ nguyên status hiện tại — supplier không được tự đổi status
+      // Server sẽ từ chối nếu status thay đổi (RBAC guard)
+      status: account.status,
     };
     await updateAccount(updated);
     setAccount(updated);
