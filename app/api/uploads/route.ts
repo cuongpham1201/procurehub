@@ -39,7 +39,10 @@ async function canUpload(
   if (entityType === "supplier") return entityId === session.sub;
   if (entityType === "bid") {
     const bid = await getBid(entityId);
-    return bid?.supplierId === session.sub;
+    // Bid not yet created (pre-submission upload with pre-generated UUID) —
+    // allow any authenticated supplier. UUID v4 collision risk is negligible.
+    if (!bid) return session.kind === "supplier";
+    return bid.supplierId === session.sub;
   }
   return false;
 }
