@@ -361,7 +361,7 @@ export default function AdminTenderCreatePage() {
     return Object.keys(errs).length === 0;
   }
 
-  async function buildTender(status: "Nháp" | "Đang mở"): Promise<AdminTender> {
+  async function buildTender(status: "Nháp" | "Đang nhận báo giá"): Promise<AdminTender> {
     return {
       id: generateTenderId(),
       code: await generateTenderCode(),
@@ -402,7 +402,7 @@ export default function AdminTenderCreatePage() {
 
   async function handlePublish() {
     if (!validate()) return;
-    const tender = await buildTender("Đang mở");
+    const tender = await buildTender("Đang nhận báo giá");
     await saveAdminTender(tender);
     setSaved(tender);
   }

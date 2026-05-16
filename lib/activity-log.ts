@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { createActivityLog } from "@/lib/repositories/procurehub";
+import type { SessionPayload } from "@/lib/auth/session";
 import type {
   ActivityAction,
   ActivityActorType,
@@ -15,6 +16,21 @@ export type ActivityActor = {
   actorName?: string;
   actorEmail?: string;
 };
+
+/**
+ * Build an ActivityActor from a verified JWT session payload.
+ * Pass the result as the fallback in withActorFallback() so that
+ * API routes attribute activity to the authenticated user automatically.
+ */
+export function actorFromSession(session: SessionPayload | null): ActivityActor {
+  if (!session) return {};
+  return {
+    actorId: session.sub,
+    actorType: session.kind === "internal" ? "internal_user" : "supplier",
+    actorName: session.name,
+    actorEmail: session.email ?? undefined,
+  };
+}
 
 function headerValue(headers: Headers, key: string): string | undefined {
   const value = headers.get(key)?.trim();
@@ -109,6 +125,8 @@ export function describeActivity(
       ? "Xóa/Rút"
       : action === "evaluated"
       ? "Đánh giá"
+      : action === "revision_requested"
+      ? "Yêu cầu bổ sung"
       : action === "locked"
       ? "Khóa"
       : action === "unlocked"

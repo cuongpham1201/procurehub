@@ -3,10 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  findByCredentials,
-  setCurrentSession,
-} from "@/services/supplierAccountStorage";
 import PublicHeader from "@/components/shared/PublicHeader";
 
 function IconAlert() {
@@ -46,14 +42,19 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const account = await findByCredentials(email, password);
-      setLoading(false);
-      if (!account) {
-        setError("Email hoặc mật khẩu không đúng.");
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password, kind: "supplier" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Đăng nhập thất bại.");
         return;
       }
-      setCurrentSession(account);
-      router.push("/");
+      router.push("/supplier/dashboard");
+    } catch {
+      setError("Lỗi kết nối. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }

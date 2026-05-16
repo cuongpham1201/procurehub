@@ -1,10 +1,13 @@
-import { fail, ok } from "@/lib/api";
+import { fail, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
   snapshot,
+  withActorFallback,
 } from "@/lib/activity-log";
+import { getServerSession } from "@/lib/auth/server";
 import { listCategories, upsertCategory } from "@/lib/repositories/procurehub";
 import type { PurchaseCategory } from "@/types/category";
 import type { ActivityAction } from "@/types/activityLog";
@@ -29,12 +32,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session || session.kind !== "internal") return unauthorized();
     const category = (await request.json()) as PurchaseCategory;
     const previous = category.id ? (await listCategories()).find((item) => item.id === category.id) ?? null : null;
     const saved = await upsertCategory(category);
     const action = resolveCategoryAction(previous, saved);
     await logActivitySafe({
-      ...getActorFromRequest(request),
+      ...withActorFallback(getActorFromRequest(request), actorFromSession(session)),
       entityType: "category",
       entityId: saved.id,
       entityName: saved.name,

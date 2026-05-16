@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser, logout } from "@/hooks/useCurrentUser";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const NAV_ITEMS = [
   { label: "Trang chủ", href: "/" },
@@ -85,6 +86,7 @@ export default function PublicHeader() {
                   <span className="inline-block w-2 h-2 bg-[#c9a227] rounded-full" />
                   <span className="max-w-[140px] truncate">{user.name}</span>
                 </span>
+                <NotificationBell variant="admin" />
                 <Link
                   href="/admin"
                   className="inline-flex items-center px-4 py-2 text-sm font-semibold text-[#0f2d5e] bg-[#c9a227] rounded-md hover:bg-[#b8960c] transition-colors"
@@ -103,6 +105,7 @@ export default function PublicHeader() {
                 <span className="hidden sm:block text-sm text-slate-600 max-w-[140px] truncate">
                   {user.name}
                 </span>
+                <NotificationBell variant="admin" />
                 <Link
                   href="/supplier/dashboard"
                   className="inline-flex items-center px-4 py-2 text-sm font-semibold text-[#0f2d5e] bg-[#c9a227] rounded-md hover:bg-[#b8960c] transition-colors"

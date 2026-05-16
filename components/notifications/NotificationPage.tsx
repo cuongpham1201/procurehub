@@ -13,7 +13,7 @@ type FilterTab = "all" | "unread" | "supplier" | "tender" | "bid";
 const TYPE_GROUPS: Record<Exclude<FilterTab, "all" | "unread">, string[]> = {
   supplier: ["SUPPLIER_REGISTERED", "SUPPLIER_APPROVED", "SUPPLIER_REJECTED", "SUPPLIER_DEACTIVATED", "SUPPLIER_NEED_MORE_INFO"],
   tender:   ["TENDER_CREATED", "TENDER_PUBLISHED", "TENDER_CLOSING_SOON", "TENDER_CLOSED", "TENDER_CANCELLED"],
-  bid:      ["BID_SUBMITTED", "BID_AWARDED", "BID_REJECTED"],
+  bid:      ["BID_SUBMITTED", "BID_AWARDED", "BID_REJECTED", "BID_NEED_MORE_INFO"],
 };
 
 const TAB_LABELS: Record<FilterTab, string> = {

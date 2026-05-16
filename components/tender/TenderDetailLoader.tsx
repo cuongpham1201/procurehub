@@ -5,9 +5,8 @@ import Link from "next/link";
 import TenderDetailPage from "./TenderDetailPage";
 import type { Tender } from "@/types/tender";
 import { getAdminTenderById, adminToPublicTender } from "@/services/tenderStorage";
-import { getInternalSession } from "@/services/authStorage";
-import { getCurrentSession } from "@/services/supplierAccountStorage";
-import { getBidsBySupplier } from "@/services/supplierBidStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { getBids } from "@/services/supplierBidStorage";
 
 type BlockedAs = "guest" | "supplier" | null;
 
@@ -15,8 +14,11 @@ export default function TenderDetailLoader({ id }: { id: string }) {
   const [tender, setTender] = useState<Tender | undefined>(undefined);
   const [blocked, setBlocked] = useState<BlockedAs>(null);
   const [ready, setReady] = useState(false);
+  const { user, loading: userLoading } = useCurrentUser();
 
   useEffect(() => {
+    if (userLoading) return; // wait for session to resolve before deciding visibility
+
     async function loadData() {
       const adminTender = await getAdminTenderById(id);
 
@@ -27,21 +29,20 @@ export default function TenderDetailLoader({ id }: { id: string }) {
       }
 
       const isOpen =
-        adminTender.status === "Đang mở" || adminTender.status === "Sắp đóng";
+        adminTender.status === "Đang nhận báo giá" || adminTender.status === "Đã đóng";
 
-      const internalUser = getInternalSession();
-      if (internalUser) {
+      if (user?.kind === "internal") {
         setTender(adminToPublicTender(adminTender));
         setReady(true);
         return;
       }
 
-      const supplierUser = getCurrentSession();
-      if (supplierUser) {
+      if (user?.kind === "supplier") {
         if (isOpen) {
           setTender(adminToPublicTender(adminTender));
         } else {
-          const hasBid = (await getBidsBySupplier(supplierUser.id)).some(
+          // GET /api/bids is already filtered by JWT session for the current supplier
+          const hasBid = (await getBids()).some(
             (b) => b.tenderId === adminTender.id
           );
           if (hasBid) {
@@ -63,7 +64,7 @@ export default function TenderDetailLoader({ id }: { id: string }) {
       setReady(true);
     }
     loadData();
-  }, [id]);
+  }, [id, user, userLoading]);
 
   if (!ready) {
     return (

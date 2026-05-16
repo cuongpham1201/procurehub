@@ -6,6 +6,7 @@ export interface SupplierAccount {
   email: string;
   phone: string;
   password: string;
+  password_hash?: string;
   profileCompleted: boolean;
   status: string;
   createdAt: string;

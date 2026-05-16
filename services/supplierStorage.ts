@@ -42,9 +42,7 @@ export async function saveSupplier(supplier: Supplier): Promise<void> {
   });
 }
 
-export async function isTaxCodeExists(taxCode: string): Promise<boolean> {
-  const normalized = taxCode.trim().replace(/\s/g, "");
-  return (await getSuppliers()).some(
-    (s) => s.taxCode.trim().replace(/\s/g, "") === normalized,
-  );
+export async function isTaxCodeExists(taxCode: string, excludeId?: string): Promise<boolean> {
+  const { isTaxCodeExists: check } = await import("@/services/supplierAccountStorage");
+  return check(taxCode, excludeId);
 }

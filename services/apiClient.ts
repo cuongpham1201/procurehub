@@ -1,10 +1,10 @@
+// All API calls include cookies automatically (same-origin fetch).
+// Actor identity for activity logs is resolved server-side via the JWT session cookie.
+
 type ApiEnvelope<T> = {
   data: T | null;
   error: string | null;
 };
-
-const INTERNAL_SESSION_KEY = "procurehub_current_internal_user";
-const SUPPLIER_SESSION_KEY = "procurehub_current_supplier";
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const body = (await response.json()) as ApiEnvelope<T>;
@@ -14,62 +14,15 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return body.data as T;
 }
 
-function getActorHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-
-  try {
-    const internalRaw = localStorage.getItem(INTERNAL_SESSION_KEY);
-    if (internalRaw) {
-      const internal = JSON.parse(internalRaw) as {
-        id?: string;
-        fullName?: string;
-        name?: string;
-        email?: string;
-      };
-      return {
-        "x-actor-type": "internal_user",
-        "x-actor-id": internal.id ?? "",
-        "x-actor-name": internal.fullName ?? internal.name ?? "",
-        "x-actor-email": internal.email ?? "",
-      };
-    }
-
-    const supplierRaw = localStorage.getItem(SUPPLIER_SESSION_KEY);
-    if (supplierRaw) {
-      const supplier = JSON.parse(supplierRaw) as {
-        id?: string;
-        companyName?: string;
-        email?: string;
-      };
-      return {
-        "x-actor-type": "supplier",
-        "x-actor-id": supplier.id ?? "",
-        "x-actor-name": supplier.companyName ?? "",
-        "x-actor-email": supplier.email ?? "",
-      };
-    }
-  } catch {
-    return {};
-  }
-
-  return {};
-}
-
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(path, {
-    cache: "no-store",
-    headers: getActorHeaders(),
-  });
+  const response = await fetch(path, { cache: "no-store" });
   return parseResponse<T>(response);
 }
 
 export async function apiPost<T>(path: string, payload: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getActorHeaders(),
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   return parseResponse<T>(response);
@@ -78,19 +31,13 @@ export async function apiPost<T>(path: string, payload: unknown): Promise<T> {
 export async function apiPut<T>(path: string, payload: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      ...getActorHeaders(),
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   return parseResponse<T>(response);
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
-  const response = await fetch(path, {
-    method: "DELETE",
-    headers: getActorHeaders(),
-  });
+  const response = await fetch(path, { method: "DELETE" });
   return parseResponse<T>(response);
 }

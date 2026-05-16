@@ -1,10 +1,13 @@
-import { fail, ok } from "@/lib/api";
+import { fail, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
   snapshot,
+  withActorFallback,
 } from "@/lib/activity-log";
+import { getServerSession } from "@/lib/auth/server";
 import { getInternalUser, listInternalUsers, upsertInternalUser } from "@/lib/repositories/procurehub";
 import type { InternalUser } from "@/types/internalUser";
 import type { ActivityAction } from "@/types/activityLog";
@@ -20,6 +23,8 @@ function resolveUserAction(previous: InternalUser | null, current: InternalUser)
 
 export async function GET() {
   try {
+    const session = await getServerSession();
+    if (!session || session.kind !== "internal") return unauthorized();
     return ok(await listInternalUsers());
   } catch (error) {
     return fail(error);
@@ -28,12 +33,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session || session.kind !== "internal") return unauthorized();
     const user = (await request.json()) as InternalUser;
     const previous = user.id ? await getInternalUser(user.id) : null;
     const saved = await upsertInternalUser(user);
     const action = resolveUserAction(previous, saved);
     await logActivitySafe({
-      ...getActorFromRequest(request),
+      ...withActorFallback(getActorFromRequest(request), actorFromSession(session)),
       entityType: "user",
       entityId: saved.id,
       entityName: saved.fullName,

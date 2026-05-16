@@ -6,26 +6,15 @@ import { useEffect, useState } from "react";
 import { updateAccount } from "@/services/supplierAccountStorage";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
+import type { Upload } from "@/types/upload";
+import { FileUploadZone } from "@/components/ui/FileUploadZone";
+import { FileList } from "@/components/ui/FileList";
 
 // ── icons ──────────────────────────────────────────────────────────────────
-function IconFile() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  );
-}
 function IconCheck() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-function IconUpload() {
-  return (
-    <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
     </svg>
   );
 }
@@ -47,12 +36,6 @@ const CATEGORIES = [
   "Dịch vụ phụ trợ",
 ];
 
-const ATTACH_DOCS = [
-  { key: "license", label: "Giấy phép kinh doanh" },
-  { key: "profile", label: "Hồ sơ năng lực" },
-  { key: "cert", label: "Chứng chỉ" },
-  { key: "finance", label: "Báo cáo tài chính" },
-];
 
 interface ProfileForm {
   address: string;
@@ -97,6 +80,7 @@ export default function SupplierProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<ProfileErrors>({});
+  const [capabilityDocs, setCapabilityDocs] = useState<Upload[]>([]);
 
   const [form, setForm] = useState<ProfileForm>({
     address: "",
@@ -133,6 +117,14 @@ export default function SupplierProfilePage() {
           quotationContact: supplier.quotationContact ?? "",
         });
         setLoading(false);
+
+        // Load capability documents
+        if (supplier?.id) {
+          fetch(`/api/uploads?entityType=supplier&entityId=${supplier.id}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((env) => { if (env?.data) setCapabilityDocs(env.data as Upload[]); })
+            .catch(() => {/* silent */});
+        }
       });
   }, [session, sessionLoading, router]);
 
@@ -383,32 +375,30 @@ export default function SupplierProfilePage() {
               <FieldError msg={errors.categories} />
             </div>
 
-            {/* 3. Documents (UI only) */}
+            {/* 3. Capability Documents */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <SectionTitle>3. Hồ sơ năng lực</SectionTitle>
               <p className="text-sm text-slate-500 mb-4">
-                Tải lên các tài liệu sau để hoàn thiện hồ sơ. (Chức năng demo — không upload thật)
+                Tải lên giấy phép kinh doanh, chứng chỉ, hồ sơ năng lực và các tài liệu liên quan.
+                Hỗ trợ PDF, DOCX, XLSX, JPG, PNG, ZIP — tối đa 25 MB mỗi tệp.
               </p>
-              <div className="space-y-3">
-                {ATTACH_DOCS.map((doc) => (
-                  <div
-                    key={doc.key}
-                    className="flex items-center gap-4 border border-dashed border-slate-200 rounded-xl p-4 hover:border-[#0f2d5e]/40 transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-50 group-hover:bg-[#0f2d5e]/5 transition-colors text-slate-400">
-                      <IconFile />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700">{doc.label}</p>
-                      <p className="text-xs text-slate-400">PDF, DOCX, XLSX — tối đa 10MB</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <IconUpload />
-                      <span className="text-xs text-slate-400 hidden sm:block">Chọn file</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {account && (
+                <div className="space-y-4">
+                  <FileUploadZone
+                    entityType="supplier"
+                    entityId={account.id}
+                    purpose="capability_doc"
+                    label="Kéo thả tệp vào đây hoặc nhấn để chọn tài liệu"
+                    onUploaded={(upload) => setCapabilityDocs((prev) => [upload, ...prev])}
+                  />
+                  <FileList
+                    uploads={capabilityDocs}
+                    canDelete
+                    onDeleted={(id) => setCapabilityDocs((prev) => prev.filter((u) => u.id !== id))}
+                    emptyText="Chưa có tài liệu nào. Tải lên để hoàn thiện hồ sơ."
+                  />
+                </div>
+              )}
             </div>
 
             {/* 4. Additional contact */}
@@ -497,7 +487,7 @@ export default function SupplierProfilePage() {
                   ["Địa chỉ & tỉnh/thành", !!form.address && !!form.province],
                   ["Giới thiệu doanh nghiệp", !!form.businessDescription],
                   ["Nhóm hàng cung cấp", form.categories.length > 0],
-                  ["Hồ sơ năng lực", false],
+                  ["Hồ sơ năng lực", capabilityDocs.length > 0],
                 ].map(([label, done]) => (
                   <li key={label as string} className="flex items-center gap-3 text-sm">
                     <span

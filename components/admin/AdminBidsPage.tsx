@@ -9,21 +9,12 @@ import type { SupplierBid, BidStatus } from "@/types/supplierBid";
 
 const BID_STATUS_COLORS: Record<string, string> = {
   "Đã nộp":           "bg-blue-100 text-blue-700",
-  "Chờ xem xét":      "bg-amber-100 text-amber-700",
-  "Đang đánh giá":    "bg-indigo-100 text-indigo-700",
-  "Cần bổ sung":      "bg-orange-100 text-orange-700",
+  "Đang xem xét":      "bg-amber-100 text-amber-700",
+  "Cần làm rõ":      "bg-orange-100 text-orange-700",
+  "Đã phản hồi":       "bg-teal-100 text-teal-700",
   "Được chọn":        "bg-emerald-100 text-emerald-700",
   "Không được chọn":  "bg-slate-100 text-slate-500",
 };
-
-const ALL_STATUSES: BidStatus[] = [
-  "Đã nộp",
-  "Chờ xem xét",
-  "Đang đánh giá",
-  "Cần bổ sung",
-  "Được chọn",
-  "Không được chọn",
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -109,10 +100,14 @@ function SortIcon({ field, current, dir }: { field: SortField; current: SortFiel
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+type QuickFilter = "all" | "pending" | BidStatus;
+
+const NEEDS_ACTION_STATUSES: BidStatus[] = ["Cần làm rõ", "Đã phản hồi"];
+
 export default function AdminBidsPage() {
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<BidStatus | "">("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -138,9 +133,10 @@ export default function AdminBidsPage() {
 
   const total = bids.length;
   const countNew = bids.filter((b) => b.status === "Đã nộp").length;
-  const countReview = bids.filter((b) => b.status === "Chờ xem xét").length;
-  const countEval = bids.filter((b) => b.status === "Đang đánh giá").length;
+  const countReview = bids.filter((b) => b.status === "Đang xem xét").length;
+  const countEval = bids.filter((b) => b.status === "Đang xem xét").length;
   const countChosen = bids.filter((b) => b.status === "Được chọn").length;
+  const countPending = bids.filter((b) => (NEEDS_ACTION_STATUSES as string[]).includes(b.status)).length;
 
   const filtered = bids.filter((b) => {
     const q = search.toLowerCase();
@@ -150,7 +146,10 @@ export default function AdminBidsPage() {
       (b.tenderCode ?? "").toLowerCase().includes(q) ||
       (bidTitle(b)).toLowerCase().includes(q) ||
       (b.bidCode ?? b.id).toLowerCase().includes(q);
-    const matchStatus = !statusFilter || b.status === statusFilter;
+    const matchStatus =
+      quickFilter === "all" ? true :
+      quickFilter === "pending" ? (NEEDS_ACTION_STATUSES as string[]).includes(b.status) :
+      b.status === quickFilter;
     return matchSearch && matchStatus;
   });
 
@@ -178,7 +177,7 @@ export default function AdminBidsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <SummaryCard label="Tổng báo giá" value={total} accent="border-slate-200" />
         <SummaryCard label="Báo giá mới" value={countNew} accent="border-blue-100" />
-        <SummaryCard label="Chờ xem xét" value={countReview} accent="border-amber-100" />
+        <SummaryCard label="Đang xem xét" value={countReview} accent="border-amber-100" />
         <SummaryCard label="Đang đánh giá" value={countEval} accent="border-indigo-100" />
         <SummaryCard label="Được chọn" value={countChosen} accent="border-emerald-100" />
       </div>
@@ -212,8 +211,44 @@ export default function AdminBidsPage() {
         );
       })()}
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      {/* Quick filter tabs */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
+        {([
+          { key: "all",     label: "Tất cả",      count: total },
+          { key: "pending", label: "Cần xử lý",   count: countPending, accent: true },
+          { key: "Đã nộp",  label: "Mới nộp",     count: countNew },
+          { key: "Đang xem xét", label: "Đang xem xét", count: countReview },
+          { key: "Đang xem xét", label: "Đang xem xét", count: countEval },
+          { key: "Được chọn",    label: "Được chọn",     count: countChosen },
+        ] as { key: QuickFilter; label: string; count: number; accent?: boolean }[]).map(({ key, label, count, accent }) => (
+          <button
+            key={key}
+            onClick={() => setQuickFilter(key)}
+            className={[
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
+              quickFilter === key
+                ? accent
+                  ? "bg-orange-500 border-orange-500 text-white"
+                  : "bg-[#0f2d5e] border-[#0f2d5e] text-white"
+                : accent && count > 0
+                  ? "border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100"
+                  : "border-slate-200 text-slate-600 bg-white hover:bg-slate-50",
+            ].join(" ")}
+          >
+            {label}
+            {count > 0 && (
+              <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none ${
+                quickFilter === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+              }`}>
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <IconSearch />
           </span>
@@ -225,16 +260,6 @@ export default function AdminBidsPage() {
             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-[#0f2d5e] focus:ring-2 focus:ring-[#0f2d5e]/10 transition-colors"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as BidStatus | "")}
-          className="sm:w-48 px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-[#0f2d5e] transition-colors bg-white"
-        >
-          <option value="">Tất cả trạng thái</option>
-          {ALL_STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

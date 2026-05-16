@@ -258,8 +258,8 @@ export default function AdminDashboard() {
       const hasData = suppliers.length > 0 || bids.length > 0 || tenders.length > 0;
       if (hasData) {
         const pending     = suppliers.filter(s => normalizeStatus(s) === "Chờ xét duyệt").length;
-        const open        = tenders.filter(t => t.status === "Đang mở").length;
-        const closingSoon = tenders.filter(t => t.status === "Sắp đóng").length;
+        const open        = tenders.filter(t => t.status === "Đang nhận báo giá").length;
+        const closingSoon = tenders.filter(t => t.status === "Đã đóng").length;
         const totalValue  = tenders.reduce((acc, t) => acc + getTenderValue(t as AdminTender & { value?: string }), 0);
 
         setStats({
@@ -308,7 +308,7 @@ export default function AdminDashboard() {
               href="/admin/tenders"
             />
             <StatCard
-              label="Đang mở"
+              label="Đang nhận báo giá"
               value={stats.openTenders}
               icon={<CheckCircle className="w-5 h-5" strokeWidth={1.8} />}
               iconBg="bg-emerald-50"
@@ -336,7 +336,7 @@ export default function AdminDashboard() {
               href="/admin/bids"
             />
             <StatCard
-              label="Sắp đóng"
+              label="Đã đóng"
               value={stats.closingSoonTenders}
               icon={<AlertTriangle className="w-5 h-5" strokeWidth={1.8} />}
               iconBg="bg-red-50"

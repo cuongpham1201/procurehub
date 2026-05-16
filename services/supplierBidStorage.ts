@@ -18,15 +18,27 @@ export async function updateBid(bid: SupplierBid): Promise<void> {
 }
 
 export async function getBidById(id: string): Promise<SupplierBid | undefined> {
-  return (await getBids()).find((b) => b.id === id);
+  try {
+    return await apiGet<SupplierBid>(`/api/bids/${encodeURIComponent(id)}`);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getBidsBySupplier(supplierId: string): Promise<SupplierBid[]> {
-  return (await getBids()).filter((b) => b.supplierId === supplierId);
+  try {
+    return await apiGet<SupplierBid[]>(`/api/bids?supplierId=${encodeURIComponent(supplierId)}`);
+  } catch {
+    return [];
+  }
 }
 
 export async function getBidsByTender(tenderId: string): Promise<SupplierBid[]> {
-  return (await getBids()).filter((b) => b.tenderId === tenderId);
+  try {
+    return await apiGet<SupplierBid[]>(`/api/bids?tenderId=${encodeURIComponent(tenderId)}`);
+  } catch {
+    return [];
+  }
 }
 
 export async function updateBidStatus(id: string, status: BidStatus): Promise<void> {
@@ -48,14 +60,13 @@ export async function markBidAsWinner(winningBidId: string, tenderId: string): P
 }
 
 export async function generateBidCode(): Promise<string> {
-  const year = new Date().getFullYear();
-  const nums = (await getBids())
-    .map((b) => b.bidCode ?? "")
-    .filter((c) => c.startsWith(`BG-${year}-`))
-    .map((c) => parseInt(c.slice(-3), 10))
-    .filter((n) => !isNaN(n));
-  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-  return `BG-${year}-${String(next).padStart(3, "0")}`;
+  try {
+    return await apiGet<string>("/api/bids/next-code");
+  } catch {
+    // Fallback client-side nếu API không khả dụng
+    const year = new Date().getFullYear();
+    return `BG-${year}-${String(Date.now()).slice(-3)}`;
+  }
 }
 
 export function generateBidId(): string {

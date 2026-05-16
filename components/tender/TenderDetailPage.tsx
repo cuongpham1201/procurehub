@@ -56,8 +56,7 @@ function IconCalendar() {
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const statusConfig: Record<string, string> = {
-  "Đang mở": "bg-green-100 text-green-700 border-green-200",
-  "Sắp đóng": "bg-orange-100 text-orange-700 border-orange-200",
+  "Đang nhận báo giá": "bg-green-100 text-green-700 border-green-200",
   "Đã đóng": "bg-slate-100 text-slate-500 border-slate-200",
   "Đã có kết quả": "bg-indigo-100 text-indigo-700 border-indigo-200",
 };

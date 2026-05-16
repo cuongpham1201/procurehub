@@ -69,8 +69,7 @@ function compareRows(a: TenderRow, b: TenderRow, field: SortField): number {
 
 const STATUS_COLORS: Record<string, string> = {
   "Nháp":            "bg-slate-100 text-slate-500",
-  "Đang mở":         "bg-green-100 text-green-700",
-  "Sắp đóng":        "bg-orange-100 text-orange-700",
+  "Đang nhận báo giá":         "bg-green-100 text-green-700",
   "Đã đóng":         "bg-slate-200 text-slate-600",
   "Đang đánh giá":   "bg-blue-100 text-blue-700",
   "Đã có kết quả":   "bg-indigo-100 text-indigo-700",
@@ -78,7 +77,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUSES: (AdminTenderStatus | "")[] = [
-  "", "Nháp", "Đang mở", "Sắp đóng", "Đã đóng", "Đang đánh giá", "Đã có kết quả", "Đã hủy",
+  "", "Nháp", "Đang nhận báo giá", "Đã đóng", "Đang đánh giá", "Đã có kết quả", "Đã hủy",
 ];
 
 // ── main component ────────────────────────────────────────────────────────
@@ -172,8 +171,8 @@ export default function AdminTendersPage() {
   });
 
   const total = rows.length;
-  const open = rows.filter((r) => r.status === "Đang mở").length;
-  const closingSoon = rows.filter((r) => r.status === "Sắp đóng").length;
+  const open = rows.filter((r) => r.status === "Đang nhận báo giá").length;
+  const closingSoon = rows.filter((r) => r.status === "Đã đóng").length;
   const draft = rows.filter((r) => r.status === "Nháp").length;
   const closed = rows.filter(
     (r) => r.status === "Đã đóng" || r.status === "Đang đánh giá"
@@ -204,8 +203,8 @@ export default function AdminTendersPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: "Tổng gói thầu", value: total, color: "text-[#0f2d5e]", bg: "bg-blue-50" },
-          { label: "Đang mở", value: open, color: "text-green-600", bg: "bg-green-50" },
-          { label: "Sắp đóng", value: closingSoon, color: "text-orange-600", bg: "bg-orange-50" },
+          { label: "Đang nhận báo giá", value: open, color: "text-green-600", bg: "bg-green-50" },
+          { label: "Đã đóng", value: closingSoon, color: "text-orange-600", bg: "bg-orange-50" },
           { label: "Nháp", value: draft, color: "text-slate-600", bg: "bg-slate-100" },
           { label: "Đã đóng / Đang đánh giá", value: closed, color: "text-amber-600", bg: "bg-amber-50" },
         ].map((c) => (

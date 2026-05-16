@@ -67,8 +67,7 @@ export function Badge({
 export function TenderStatusBadge({ status }: { status: string }) {
   const map: Record<string, BadgeVariant> = {
     "Nháp":           "muted",
-    "Đang mở":        "success",
-    "Sắp đóng":       "warning",
+    "Đang nhận báo giá":        "success",
     "Đã đóng":        "default",
     "Đang đánh giá":  "info",
     "Đã có kết quả":  "accent",
@@ -95,9 +94,8 @@ export function SupplierStatusBadge({ status }: { status: string }) {
 export function BidStatusBadge({ status }: { status: string }) {
   const map: Record<string, BadgeVariant> = {
     "Đã nộp":           "info",
-    "Chờ xem xét":      "pending",
-    "Đang đánh giá":    "warning",
-    "Cần bổ sung":      "warning",
+    "Đang xem xét":      "pending",
+    "Cần làm rõ":      "warning",
     "Được chọn":        "success",
     "Không được chọn":  "danger",
   };

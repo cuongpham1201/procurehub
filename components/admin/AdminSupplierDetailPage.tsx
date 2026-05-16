@@ -8,6 +8,8 @@ import { getBids } from "@/services/supplierBidStorage";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { SupplierBid } from "@/types/supplierBid";
+import type { Upload } from "@/types/upload";
+import { FileList } from "@/components/ui/FileList";
 
 // ── permissions ───────────────────────────────────────────────────────────
 
@@ -143,6 +145,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
   const role = currentUser?.role ?? "Chỉ xem";
   const [account, setAccount] = useState<SupplierAccount | null | undefined>(undefined);
   const [bids, setBids] = useState<SupplierBid[]>([]);
+  const [capabilityUploads, setCapabilityUploads] = useState<Upload[]>([]);
   const [successMsg, setSuccessMsg] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<EditForm | null>(null);
@@ -150,10 +153,15 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
 
   useEffect(() => {
     async function loadData() {
-      const [all, allBids] = await Promise.all([getAccounts(), getBids()]);
+      const [all, allBids, uploadsRes] = await Promise.all([
+        getAccounts(),
+        getBids(),
+        fetch(`/api/uploads?entityType=supplier&entityId=${encodeURIComponent(id)}`).then((r) => r.json()).catch(() => ({ data: [] })),
+      ]);
       const found = all.find((a) => a.id === id) ?? null;
       setAccount(found);
       setBids(allBids.filter((b) => b.supplierId === id));
+      setCapabilityUploads(uploadsRes.data ?? []);
     }
     loadData();
   }, [id]);
@@ -450,6 +458,25 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
                   </div>
                 </div>
               )}
+
+              {/* Capability documents uploaded by supplier */}
+              <section className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-700 text-sm">
+                    Tài liệu năng lực
+                    {capabilityUploads.length > 0 && (
+                      <span className="ml-2 text-xs font-normal text-slate-400">({capabilityUploads.length})</span>
+                    )}
+                  </h3>
+                </div>
+                <div className="px-5 py-4">
+                  <FileList
+                    uploads={capabilityUploads}
+                    canDelete={false}
+                    emptyText="Nhà cung cấp chưa tải lên tài liệu năng lực nào."
+                  />
+                </div>
+              </section>
             </>
           )}
 

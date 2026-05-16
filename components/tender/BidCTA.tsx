@@ -12,10 +12,10 @@ const CLOSED_STATUSES = ["Đã đóng", "Đang đánh giá", "Đã có kết qu�
 
 const BID_STATUS_CLS: Record<string, string> = {
   "Đã nộp":           "bg-blue-50 border-blue-200 text-blue-700",
-  "Chờ xem xét":      "bg-amber-50 border-amber-200 text-amber-700",
+  "Đang xem xét":      "bg-amber-50 border-amber-200 text-amber-700",
   "Đang đánh giá":    "bg-indigo-50 border-indigo-200 text-indigo-700",
-  "Cần bổ sung":      "bg-orange-50 border-orange-200 text-orange-700",
-  "Đã bổ sung":       "bg-teal-50 border-teal-200 text-teal-700",
+  "Cần làm rõ":      "bg-orange-50 border-orange-200 text-orange-700",
+  "Đã phản hồi":       "bg-teal-50 border-teal-200 text-teal-700",
   "Được chọn":        "bg-emerald-50 border-emerald-200 text-emerald-700",
   "Không được chọn":  "bg-slate-50 border-slate-200 text-slate-500",
 };
@@ -72,7 +72,7 @@ function ExistingBidCTA({
   const total = bid.totalAmount ?? bid.totalPrice ?? 0;
   const date = bid.submittedAt ?? bid.createdAt ?? "";
   const code = bid.bidCode ?? bid.id;
-  const canUpdate = bid.status === "Cần bổ sung";
+  const canUpdate = bid.status === "Cần làm rõ";
 
   return (
     <div className={`rounded-xl border p-4 ${statusCls}`}>

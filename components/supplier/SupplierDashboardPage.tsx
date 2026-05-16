@@ -216,7 +216,7 @@ function buildActionItems(account: SupplierAccount, myBids: SupplierBid[]): Acti
 
   // Bids that require action
   for (const bid of myBids) {
-    if (bid.status === "Cần bổ sung") {
+    if (bid.status === "Cần làm rõ") {
       const tLabel = [bid.tenderCode, bid.tenderTitle ?? bid.tenderName ?? ""]
         .filter(Boolean).join(" – ");
       items.push({
@@ -281,7 +281,7 @@ function buildHistoryItems(account: SupplierAccount, myBids: SupplierBid[]): His
       items.push({ id: `bid-chosen-${bid.id}`, colorScheme: "emerald",
         title: "Chúc mừng! Báo giá được chọn", description: tLabel, date,
         actionLabel: "Xem báo giá", actionHref: "/supplier/bids" });
-    } else if (bid.status === "Đã bổ sung") {
+    } else if (bid.status === "Đã phản hồi") {
       items.push({ id: `bid-resubmit-${bid.id}`, colorScheme: "teal",
         title: "Đã gửi lại báo giá", description: tLabel, date,
         actionLabel: "Xem báo giá", actionHref: "/supplier/bids" });
@@ -289,11 +289,11 @@ function buildHistoryItems(account: SupplierAccount, myBids: SupplierBid[]): His
       items.push({ id: `bid-rejected-${bid.id}`, colorScheme: "slate",
         title: "Báo giá không được chọn", description: tLabel, date,
         actionLabel: "Xem kết quả", actionHref: "/supplier/bids" });
-    } else if (bid.status === "Đang đánh giá") {
+    } else if (bid.status === "Đang xem xét") {
       items.push({ id: `bid-eval-${bid.id}`, colorScheme: "indigo",
         title: "Báo giá đang được đánh giá", description: tLabel, date,
         actionLabel: "Theo dõi", actionHref: "/supplier/bids" });
-    } else if (bid.status === "Đã nộp" || bid.status === "Chờ xem xét") {
+    } else if (bid.status === "Đã nộp") {
       items.push({ id: `bid-submitted-${bid.id}`, colorScheme: "slate",
         title: "Báo giá đã nộp – chờ xử lý", description: tLabel, date,
         actionLabel: "Xem báo giá", actionHref: "/supplier/bids" });
@@ -335,7 +335,7 @@ export default function SupplierDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
-    const allOpen = (await getTenders()).filter((t) => t.status === "Đang mở" || t.status === "Sắp đóng");
+    const allOpen = (await getTenders()).filter((t) => t.status === "Đang nhận báo giá" || t.status === "Đã đóng");
     setOpenTenders(allOpen.length);
 
     if (!session || session.kind !== "supplier") {
@@ -610,7 +610,7 @@ export default function SupplierDashboardPage() {
           <StatCard
             label="Gói thầu đang mở"
             value={openTenders}
-            sub="Đang mở hoặc sắp đóng"
+            sub="Đang nhận báo giá hoặc sắp đóng"
             icon={<ClipboardList className="w-5 h-5" strokeWidth={1.8} />}
             accent="bg-[#0f2d5e]/10 text-[#0f2d5e]"
           />

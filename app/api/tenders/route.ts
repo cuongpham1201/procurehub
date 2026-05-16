@@ -1,10 +1,13 @@
-import { fail, ok } from "@/lib/api";
+import { fail, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
   snapshot,
+  withActorFallback,
 } from "@/lib/activity-log";
+import { getServerSession } from "@/lib/auth/server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import { listTenders, upsertTender } from "@/lib/repositories/procurehub";
@@ -18,7 +21,7 @@ export const dynamic = "force-dynamic";
 function resolveTenderAction(previous: AdminTender | null, current: AdminTender): ActivityAction {
   if (!previous) return "created";
   if (previous.status !== current.status) {
-    if (current.status === "Đang mở") return "published";
+    if (current.status === "Đang nhận báo giá") return "published";
     if (current.status === "Đã hủy") return "cancelled";
     if (current.status === "Đã đóng") return "closed";
     if (current.status === "Đã có kết quả") return "awarded";
@@ -28,7 +31,15 @@ function resolveTenderAction(previous: AdminTender | null, current: AdminTender)
 
 export async function GET() {
   try {
-    return ok(await listTenders());
+    const session = await getServerSession();
+    const tenders = await listTenders();
+
+    // Non-internal users (supplier, guest) only see published/visible tenders
+    if (!session || session.kind !== "internal") {
+      return ok(tenders.filter((t) => t.status !== "Nháp" && t.status !== "Đã hủy" && t.status !== "Chờ phê duyệt"));
+    }
+
+    return ok(tenders);
   } catch (error) {
     return fail(error);
   }
@@ -36,12 +47,27 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session || session.kind !== "internal") return unauthorized();
     const tender = (await request.json()) as AdminTender;
+
+    // ── Validation ────────────────────────────────────────────────────────────
+    if (!tender.title?.trim())
+      return fail(new Error("Tên gói thầu không được để trống"), 400);
+    if (!tender.category?.trim())
+      return fail(new Error("Danh mục không được để trống"), 400);
+    if (!tender.deadline?.trim())
+      return fail(new Error("Hạn nộp báo giá không được để trống"), 400);
+    const deadlineDate = new Date(tender.deadline);
+    if (isNaN(deadlineDate.getTime()))
+      return fail(new Error("Hạn nộp báo giá không hợp lệ"), 400);
+    // ─────────────────────────────────────────────────────────────────────────
+
     const previous = tender.id ? (await listTenders()).find((item) => item.id === tender.id) ?? null : null;
     const saved = await upsertTender(tender);
     const action = resolveTenderAction(previous, saved);
     await logActivitySafe({
-      ...getActorFromRequest(request),
+      ...withActorFallback(getActorFromRequest(request), actorFromSession(session)),
       entityType: "tender",
       entityId: saved.id,
       entityName: saved.title,

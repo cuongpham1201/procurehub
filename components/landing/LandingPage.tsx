@@ -226,8 +226,7 @@ function getCategoryIcon(name: string) {
 // ─── Màu badge trạng thái ─────────────────────────────────────────────────────
 
 const statusStyle: Record<string, string> = {
-  "Đang mở": "bg-green-100 text-green-700",
-  "Sắp đóng": "bg-orange-100 text-orange-700",
+  "Đang nhận báo giá": "bg-green-100 text-green-700",
   "Đã đóng": "bg-slate-100 text-slate-500",
   "Đã có kết quả": "bg-indigo-100 text-indigo-700",
 };
@@ -268,7 +267,7 @@ function buildCategories(tenders: AdminTender[], categories: PurchaseCategory[])
 
 function buildLatestOpenTenders(tenders: AdminTender[]): Tender[] {
   return [...tenders]
-    .filter((t) => t.status === "Đang mở" || t.status === "Sắp đóng")
+    .filter((t) => t.status === "Đang nhận báo giá" || t.status === "Đã đóng")
     .sort((a, b) => {
       const deadlineDiff = parseDateTime(a.deadline) - parseDateTime(b.deadline);
       if (deadlineDiff !== 0) return deadlineDiff;

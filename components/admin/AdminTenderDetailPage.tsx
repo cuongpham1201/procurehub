@@ -30,8 +30,7 @@ function canChangeStatus(role: string) {
 
 const STATUS_COLORS: Record<string, string> = {
   "Nháp":           "bg-slate-100 text-slate-600 border-slate-200",
-  "Đang mở":        "bg-green-100 text-green-700 border-green-200",
-  "Sắp đóng":       "bg-orange-100 text-orange-700 border-orange-200",
+  "Đang nhận báo giá":        "bg-green-100 text-green-700 border-green-200",
   "Đã đóng":        "bg-slate-200 text-slate-600 border-slate-300",
   "Đang đánh giá":  "bg-blue-100 text-blue-700 border-blue-200",
   "Đã có kết quả":  "bg-indigo-100 text-indigo-700 border-indigo-200",
@@ -80,11 +79,10 @@ function getActions(current: AdminTenderStatus): ActionConfig[] {
   switch (current) {
     case "Nháp":
       return [
-        { key: "Đang mở", label: "Phát hành gói thầu", style: "bg-[#0f2d5e] text-white hover:bg-[#0d2550]" },
+        { key: "Đang nhận báo giá", label: "Phát hành gói thầu", style: "bg-[#0f2d5e] text-white hover:bg-[#0d2550]" },
         { key: "Đã hủy",  label: "Hủy gói thầu",       style: "border border-red-300 text-red-600 hover:bg-red-50" },
       ];
-    case "Đang mở":
-    case "Sắp đóng":
+    case "Đang nhận báo giá":
       return [
         { key: "Đã đóng", label: "Đóng thầu",   style: "bg-amber-500 text-white hover:bg-amber-600" },
         { key: "Đã hủy",  label: "Hủy gói thầu", style: "border border-red-300 text-red-600 hover:bg-red-50" },
@@ -943,9 +941,9 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                   </button>
                 </div>
               )}
-              {tender.status === "Đang đánh giá" && (
+              {tender.status === "Đang đánh giá" && bids.length > 0 && (
                 <Link
-                  href={`/admin/bid-comparison?tenderId=${tender.id}`}
+                  href={`/admin/tenders/${tender.id}/comparison`}
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

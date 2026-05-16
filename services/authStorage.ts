@@ -1,8 +1,6 @@
 import { apiGet, apiPost } from "@/services/apiClient";
 import type { InternalUser } from "@/types/internalUser";
 
-const INTERNAL_SESSION_KEY = "procurehub_current_internal_user";
-const SUPPLIER_SESSION_KEY = "procurehub_current_supplier";
 export const INTERNAL_DEFAULT_PASSWORD = "123456";
 
 export const MOCK_ADMIN: InternalUser = {
@@ -90,26 +88,5 @@ export async function resetInternalPassword(
   });
 }
 
-export function getInternalSession(): InternalUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(INTERNAL_SESSION_KEY);
-    return raw ? (JSON.parse(raw) as InternalUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function setInternalSession(user: InternalUser): void {
-  const safe = { ...user, password: "" };
-  localStorage.setItem(INTERNAL_SESSION_KEY, JSON.stringify(safe));
-}
-
-export function clearInternalSession(): void {
-  localStorage.removeItem(INTERNAL_SESSION_KEY);
-}
-
-export function clearAllSessions(): void {
-  localStorage.removeItem(INTERNAL_SESSION_KEY);
-  localStorage.removeItem(SUPPLIER_SESSION_KEY);
-}
+// Session management is now handled by JWT cookie (ph_auth).
+// Use useCurrentUser() hook in client components, or getServerSession() in API routes.

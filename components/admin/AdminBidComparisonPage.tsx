@@ -40,16 +40,14 @@ function getBidCode(b: SupplierBid): string {
 // ── status colours ─────────────────────────────────────────────────────────
 const STATUS_CLS: Record<string, string> = {
   "Đã nộp":           "bg-blue-100 text-blue-700",
-  "Chờ xem xét":      "bg-amber-100 text-amber-700",
-  "Đang đánh giá":    "bg-indigo-100 text-indigo-700",
-  "Cần bổ sung":      "bg-orange-100 text-orange-700",
+  "Đang xem xét":      "bg-amber-100 text-amber-700",
+  "Cần làm rõ":      "bg-orange-100 text-orange-700",
   "Được chọn":        "bg-emerald-100 text-emerald-700",
   "Không được chọn":  "bg-slate-100 text-slate-500",
 };
 
 const TENDER_STATUS_CLS: Record<string, string> = {
-  "Đang mở":        "bg-green-100 text-green-700",
-  "Sắp đóng":       "bg-orange-100 text-orange-700",
+  "Đang nhận báo giá":        "bg-green-100 text-green-700",
   "Đã đóng":        "bg-slate-100 text-slate-500",
   "Đang đánh giá":  "bg-indigo-100 text-indigo-700",
   "Đã có kết quả":  "bg-purple-100 text-purple-700",
@@ -141,7 +139,7 @@ export default function AdminBidComparisonPage() {
     // Hint: tenders that have bids but are not yet in "Đang đánh giá"
     const waiting = allTenders.filter(
       (t) =>
-        (t.status === "Đã đóng" || t.status === "Đang mở") &&
+        (t.status === "Đã đóng" || t.status === "Đang nhận báo giá") &&
         allBids.some((b) => b.tenderId === t.id)
     );
     const q = tenderSearch.toLowerCase().trim();

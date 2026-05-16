@@ -8,7 +8,7 @@ export const tenders: Tender[] = [
     category: "Nguyên vật liệu",
     inviter: "Bia Hạ Long",
     deadline: "15/06/2025",
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     value: "2.400.000.000 ₫",
     description:
       "Yêu cầu cung cấp thép cuộn cán nóng tiêu chuẩn Q195/Q235, dày 1.5–4mm, khổ 1000–1250mm. Số lượng dự kiến 80–100 tấn/tháng. Giao hàng tại nhà máy KCN Việt Hưng, Hạ Long.",
@@ -49,7 +49,7 @@ export const tenders: Tender[] = [
     category: "Máy móc",
     inviter: "Bia Hạ Long",
     deadline: "20/06/2025",
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     value: "850.000.000 ₫",
     description:
       "Cần mua sắm 02 bộ máy nén khí trục vít có công suất 37kW, lưu lượng ≥ 6,5 m³/phút, áp suất làm việc 8 bar. Bao gồm lắp đặt, đào tạo vận hành và bảo hành 24 tháng.",
@@ -90,7 +90,7 @@ export const tenders: Tender[] = [
     category: "Thiết bị",
     inviter: "Bia Hạ Long",
     deadline: "10/06/2025",
-    status: "Sắp đóng",
+    status: "Đã đóng",
     value: "1.200.000.000 ₫",
     description:
       "Trang bị hệ thống đo kiểm chất lượng cho xưởng cơ khí bao gồm 01 máy đo tọa độ 3D CMM, bộ panme điện tử, thước cặp điện tử và thiết bị đo độ nhám bề mặt.",
@@ -131,7 +131,7 @@ export const tenders: Tender[] = [
     category: "Nguyên vật liệu",
     inviter: "Bia Hạ Long",
     deadline: "25/06/2025",
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     value: "380.000.000 ₫",
     description:
       "Cung cấp dầu thủy lực ISO VG 46 (600 lít) và dầu hộp số ISO VG 68 (400 lít) theo tiêu chuẩn DIN 51524. Đóng gói 200 lít/thùng, giao hàng định kỳ hàng quý.",
@@ -171,7 +171,7 @@ export const tenders: Tender[] = [
     category: "Dịch vụ phụ trợ",
     inviter: "Bia Hạ Long",
     deadline: "30/06/2025",
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     value: "560.000.000 ₫",
     description:
       "Hợp đồng bảo trì hệ thống điện hạ thế và trung thế toàn nhà máy, chu kỳ bảo trì 3 tháng/lần. Yêu cầu đơn vị có giấy phép hoạt động điện lực và kỹ sư có chứng chỉ hành nghề.",
@@ -212,7 +212,7 @@ export const tenders: Tender[] = [
     category: "Công cụ dụng cụ",
     inviter: "Bia Hạ Long",
     deadline: "05/06/2025",
-    status: "Sắp đóng",
+    status: "Đã đóng",
     value: "145.000.000 ₫",
     description:
       "Bổ sung kho vật tư tiêu hao cho phân xưởng cơ khí: dao phay ngón phi 6–25mm hợp kim cứng, mũi khoan HSS-Co 3–20mm, dao tiện ren và dao tiện ngoài hãng Sandvik hoặc tương đương.",
@@ -255,7 +255,7 @@ export const tenders: Tender[] = [
     category: "Thiết bị",
     inviter: "Bia Hạ Long",
     deadline: "18/07/2025",
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     value: "420.000.000 ₫",
     description:
       "Trang bị hệ thống camera IP độ phân giải 4K cho 3 khu vực: kho nguyên liệu, phân xưởng đóng lon và khu vực xuất hàng. Bao gồm server lưu trữ NAS và phần mềm quản lý tập trung.",
@@ -339,7 +339,7 @@ export const tenders: Tender[] = [
     category: "Nguyên vật liệu",
     inviter: "Bia Hạ Long",
     deadline: "28/05/2025",
-    status: "Sắp đóng",
+    status: "Đã đóng",
     value: "5.800.000.000 ₫",
     description:
       "Cung cấp vỏ lon nhôm 330ml tiêu chuẩn nội địa, số lượng 5 triệu lon/lô, in màu theo thiết kế riêng của Bia Hạ Long. Đảm bảo tiêu chuẩn an toàn thực phẩm HACCP.",
@@ -380,7 +380,7 @@ export const tenders: Tender[] = [
     category: "Công cụ dụng cụ",
     inviter: "Bia Hạ Long",
     deadline: "10/07/2025",
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     value: "95.000.000 ₫",
     description:
       "Bổ sung thiết bị đo lường cho hệ thống nồi hơi: đồng hồ đo áp suất lò hơi Wika, cảm biến nhiệt độ Pt100, van an toàn và bộ ghi dữ liệu nhiệt độ áp suất theo thời gian thực.",

@@ -1,10 +1,13 @@
-import { fail, ok } from "@/lib/api";
+import { fail, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
   snapshot,
+  withActorFallback,
 } from "@/lib/activity-log";
+import { getServerSession } from "@/lib/auth/server";
 import { getMaterial, listMaterials, upsertMaterial } from "@/lib/repositories/procurehub";
 import type { MaterialItem } from "@/types/category";
 import type { ActivityAction } from "@/types/activityLog";
@@ -29,12 +32,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session || session.kind !== "internal") return unauthorized();
     const material = (await request.json()) as MaterialItem;
     const previous = material.id ? await getMaterial(material.id) : null;
     const saved = await upsertMaterial(material);
     const action = resolveMaterialAction(previous, saved);
     await logActivitySafe({
-      ...getActorFromRequest(request),
+      ...withActorFallback(getActorFromRequest(request), actorFromSession(session)),
       entityType: "material",
       entityId: saved.id,
       entityName: saved.materialName,

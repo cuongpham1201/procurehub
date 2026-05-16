@@ -7,14 +7,17 @@ import { getBidById, updateBidStatus, deleteBid } from "@/services/supplierBidSt
 import { getAccounts } from "@/services/supplierAccountStorage";
 import type { SupplierBid, BidItem, BidStatus } from "@/types/supplierBid";
 import type { SupplierAccount } from "@/types/supplierAccount";
+import type { BidClarification } from "@/types/bidClarification";
+import type { Upload } from "@/types/upload";
+import { FileList } from "@/components/ui/FileList";
 
 // ── Status config ─────────────────────────────────────────────────────────────
 
 const BID_STATUS_COLORS: Record<string, string> = {
   "Đã nộp":           "bg-blue-100 text-blue-700 border-blue-200",
-  "Chờ xem xét":      "bg-amber-100 text-amber-700 border-amber-200",
-  "Đang đánh giá":    "bg-indigo-100 text-indigo-700 border-indigo-200",
-  "Cần bổ sung":      "bg-orange-100 text-orange-700 border-orange-200",
+  "Đang xem xét":      "bg-amber-100 text-amber-700 border-amber-200",
+  "Cần làm rõ":      "bg-orange-100 text-orange-700 border-orange-200",
+  "Đã phản hồi":       "bg-teal-100 text-teal-700 border-teal-200",
   "Được chọn":        "bg-emerald-100 text-emerald-700 border-emerald-200",
   "Không được chọn":  "bg-slate-100 text-slate-500 border-slate-200",
 };
@@ -165,20 +168,22 @@ interface ActionBtn { label: string; status: BidStatus; style: string; }
 function getActions(current: BidStatus): ActionBtn[] {
   switch (current) {
     case "Đã nộp":
-      return [{ label: "Bắt đầu xem xét", status: "Chờ xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
-    case "Chờ xem xét":
+      return [{ label: "Bắt đầu xem xét", status: "Đang xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
+    case "Đang xem xét":
       return [
-        { label: "Chuyển sang đánh giá", status: "Đang đánh giá", style: "bg-indigo-600 hover:bg-indigo-700 text-white" },
-        { label: "Yêu cầu bổ sung", status: "Cần bổ sung", style: "bg-orange-500 hover:bg-orange-600 text-white" },
+        { label: "Chuyển sang đánh giá", status: "Đang xem xét", style: "bg-indigo-600 hover:bg-indigo-700 text-white" },
+        { label: "Yêu cầu bổ sung", status: "Cần làm rõ", style: "bg-orange-500 hover:bg-orange-600 text-white" },
         { label: "Không chọn", status: "Không được chọn", style: "bg-slate-500 hover:bg-slate-600 text-white" },
       ];
-    case "Đang đánh giá":
+    case "Đang xem xét":
       return [
-        { label: "Yêu cầu bổ sung", status: "Cần bổ sung", style: "bg-orange-500 hover:bg-orange-600 text-white" },
+        { label: "Yêu cầu bổ sung", status: "Cần làm rõ", style: "bg-orange-500 hover:bg-orange-600 text-white" },
         { label: "Không chọn", status: "Không được chọn", style: "bg-slate-500 hover:bg-slate-600 text-white" },
       ];
-    case "Cần bổ sung":
-      return [{ label: "Tiếp tục xem xét", status: "Chờ xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
+    case "Cần làm rõ":
+      return [{ label: "Tiếp tục xem xét", status: "Đang xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
+    case "Đã phản hồi":
+      return [{ label: "Chuyển sang đánh giá", status: "Đang xem xét", style: "bg-indigo-600 hover:bg-indigo-700 text-white" }];
     default:
       return [];
   }
@@ -214,11 +219,24 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
   const [successMsg, setSuccessMsg] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Clarification state
+  const [clarifications, setClarifications] = useState<BidClarification[]>([]);
+  const [clarifyOpen, setClarifyOpen] = useState(false);
+  const [clarifyNote, setClarifyNote] = useState("");
+  const [clarifyLoading, setClarifyLoading] = useState(false);
+  // Attachments
+  const [bidUploads, setBidUploads] = useState<Upload[]>([]);
 
   useEffect(() => {
     async function loadData() {
-      const found = await getBidById(bidId);
+      const [found, clarRes, uploadsRes] = await Promise.all([
+        getBidById(bidId),
+        fetch(`/api/bids/${encodeURIComponent(bidId)}/clarifications`).then((r) => r.json()).catch(() => ({ data: [] })),
+        fetch(`/api/uploads?entityType=bid&entityId=${encodeURIComponent(bidId)}`).then((r) => r.json()).catch(() => ({ data: [] })),
+      ]);
       setBid(found ?? null);
+      setClarifications(clarRes.data ?? []);
+      setBidUploads(uploadsRes.data ?? []);
       if (found) {
         const accounts = await getAccounts();
         setSupplierAccount(accounts.find((a) => a.id === found.supplierId) ?? null);
@@ -236,10 +254,39 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
 
   async function handleStatusUpdate(newStatus: BidStatus) {
     if (!bid) return;
+    // "Cần làm rõ" được xử lý qua modal clarification, không direct update
+    if (newStatus === "Cần làm rõ") {
+      setClarifyOpen(true);
+      return;
+    }
     await updateBidStatus(bid.id, newStatus);
     setBid((prev) => (prev ? { ...prev, status: newStatus } : prev));
     setSuccessMsg("Đã cập nhật trạng thái báo giá.");
     setTimeout(() => setSuccessMsg(""), 4000);
+  }
+
+  async function handleSubmitClarification() {
+    if (!bid || !clarifyNote.trim()) return;
+    setClarifyLoading(true);
+    try {
+      const res = await fetch(`/api/bids/${encodeURIComponent(bid.id)}/clarifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestNote: clarifyNote.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Lỗi khi gửi yêu cầu");
+      setClarifications((prev) => [...prev, json.data]);
+      setBid((prev) => (prev ? { ...prev, status: "Cần làm rõ" } : prev));
+      setClarifyOpen(false);
+      setClarifyNote("");
+      setSuccessMsg("Đã gửi yêu cầu làm rõ đến nhà cung cấp.");
+      setTimeout(() => setSuccessMsg(""), 5000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Lỗi không xác định");
+    } finally {
+      setClarifyLoading(false);
+    }
   }
 
   if (loading) {
@@ -271,10 +318,102 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
         </div>
       </div>
 
+      {bid.status === "Đã phản hồi" && (
+        <div className="flex items-start gap-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3.5 mb-5">
+          <svg className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-teal-800">Nhà cung cấp đã cập nhật báo giá</p>
+            <p className="text-xs text-teal-700 mt-0.5">Báo giá đã được bổ sung theo yêu cầu. Vui lòng xem lại và chuyển sang đánh giá hoặc yêu cầu bổ sung thêm.</p>
+          </div>
+        </div>
+      )}
       {successMsg && (
         <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 mb-5 text-sm">
           <IconCheck />
           {successMsg}
+        </div>
+      )}
+
+      {/* ── Clarification Modal ────────────────────────────────────────────── */}
+      {clarifyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-1">Yêu cầu làm rõ báo giá</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Mô tả cụ thể thông tin cần nhà cung cấp làm rõ. Nội dung này sẽ được gửi đến nhà cung cấp.
+            </p>
+            <textarea
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              rows={5}
+              placeholder="Vd: Cần bổ sung catalogue kỹ thuật cho mặt hàng X. Đơn giá mặt hàng Y cao hơn thị trường, đề nghị giải thích..."
+              value={clarifyNote}
+              onChange={(e) => setClarifyNote(e.target.value)}
+              autoFocus
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handleSubmitClarification}
+                disabled={!clarifyNote.trim() || clarifyLoading}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+              >
+                {clarifyLoading ? "Đang gửi..." : "Gửi yêu cầu"}
+              </button>
+              <button
+                onClick={() => { setClarifyOpen(false); setClarifyNote(""); }}
+                className="flex-1 border border-slate-200 text-slate-600 font-medium py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Clarification Timeline ─────────────────────────────────────────── */}
+      {clarifications.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl px-5 py-4 mb-5">
+          <h3 className="text-sm font-semibold text-orange-800 mb-3">Lịch sử yêu cầu làm rõ ({clarifications.length})</h3>
+          <div className="space-y-4">
+            {clarifications.map((c) => (
+              <div key={c.id} className="space-y-2">
+                {/* Request */}
+                <div className="flex gap-3">
+                  <div className="w-1.5 rounded-full bg-orange-400 shrink-0 mt-1" style={{ minHeight: 40 }} />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-orange-700">Yêu cầu từ {c.requestedByName}</span>
+                      <span className="text-xs text-slate-400">{new Date(c.requestedAt).toLocaleString("vi-VN")}</span>
+                    </div>
+                    <p className="text-sm text-slate-700 bg-white border border-orange-100 rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
+                      {c.requestNote}
+                    </p>
+                  </div>
+                </div>
+                {/* Response */}
+                {c.status === "responded" && c.responseNote && (
+                  <div className="flex gap-3 pl-4">
+                    <div className="w-1.5 rounded-full bg-teal-400 shrink-0 mt-1" style={{ minHeight: 40 }} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-teal-700">Phản hồi từ {c.respondedByName}</span>
+                        {c.respondedAt && <span className="text-xs text-slate-400">{new Date(c.respondedAt).toLocaleString("vi-VN")}</span>}
+                      </div>
+                      <p className="text-sm text-slate-700 bg-white border border-teal-100 rounded-lg px-3 py-2 whitespace-pre-wrap leading-relaxed">
+                        {c.responseNote}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {c.status === "pending" && (
+                  <div className="pl-4 ml-2">
+                    <span className="text-xs text-orange-600 italic">Chờ nhà cung cấp phản hồi...</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -336,6 +475,15 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
             <BidItemsTable items={bid.items} />
           </Section>
 
+          {/* Tài liệu đính kèm từ nhà cung cấp */}
+          <Section title={`Tài liệu đính kèm${bidUploads.length ? ` (${bidUploads.length})` : ""}`}>
+            <FileList
+              uploads={bidUploads}
+              canDelete={false}
+              emptyText="Nhà cung cấp chưa đính kèm tài liệu nào."
+            />
+          </Section>
+
         </div>
 
         <div className="flex flex-col gap-5">
@@ -382,12 +530,12 @@ export default function AdminBidDetailPage({ bidId }: { bidId: string }) {
             ) : (
               <p className="text-xs text-slate-400">Không có thao tác nào khả dụng.</p>
             )}
-            {bid.status === "Đang đánh giá" && (
+            {bid.status === "Đang xem xét" && bid.tenderId && (
               <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
                 <p className="text-xs text-indigo-700 font-medium mb-1">Chọn NCC trúng thầu</p>
                 <p className="text-xs text-indigo-600 mb-2">Việc chốt nhà cung cấp được thực hiện tại trang So sánh báo giá.</p>
                 <Link
-                  href="/admin/bid-comparison"
+                  href={`/admin/tenders/${bid.tenderId}/comparison`}
                   className="block text-center text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 py-1.5 rounded-lg transition-colors"
                 >
                   Đến So sánh báo giá →

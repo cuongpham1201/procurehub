@@ -1,9 +1,7 @@
-import AdminBidComparisonPage from "@/components/admin/AdminBidComparisonPage";
+// Standalone comparison flow đã được thay thế bởi contextual per-line-item comparison.
+// Truy cập qua: Admin → Gói thầu → [Chọn gói thầu] → So sánh báo giá
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "So sánh báo giá – Cổng quản trị Bia Hạ Long",
-};
-
-export default function Page() {
-  return <AdminBidComparisonPage />;
+export default function BidComparisonRedirect() {
+  redirect("/admin/tenders");
 }

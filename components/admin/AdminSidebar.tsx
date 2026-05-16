@@ -9,7 +9,6 @@ import {
   Package,
   Building2,
   DollarSign,
-  BarChart2,
   Users,
   Clock,
   ExternalLink,
@@ -36,9 +35,8 @@ const NAV_GROUPS = [
   {
     label: "Quản lý",
     items: [
-      { label: "Nhà cung cấp",    href: "/admin/suppliers",       icon: Building2 },
-      { label: "Báo giá",         href: "/admin/bids",            icon: DollarSign },
-      { label: "So sánh báo giá", href: "/admin/bid-comparison",  icon: BarChart2 },
+      { label: "Nhà cung cấp", href: "/admin/suppliers", icon: Building2 },
+      { label: "Báo giá",      href: "/admin/bids",      icon: DollarSign },
     ],
   },
   {

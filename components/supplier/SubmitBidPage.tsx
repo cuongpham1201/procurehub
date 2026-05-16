@@ -12,7 +12,10 @@ import type { SupplierAccount } from "@/types/supplierAccount";
 import type { AdminTender } from "@/types/adminTender";
 import type { Tender } from "@/types/tender";
 import type { SupplierBid, BidItem } from "@/types/supplierBid";
+import type { Upload } from "@/types/upload";
 import PublicHeader from "@/components/shared/PublicHeader";
+import { FileUploadZone } from "@/components/ui/FileUploadZone";
+import { FileList } from "@/components/ui/FileList";
 
 // ── icons ──────────────────────────────────────────────────────────────────
 function IconCheck() {
@@ -185,11 +188,21 @@ function AlreadySubmitted({ tender }: { tender: Tender }) {
 }
 
 // ── success state ──────────────────────────────────────────────────────────
-function SuccessState({ tender, bidCode }: { tender: Tender; bidCode: string }) {
+function SuccessState({
+  tender,
+  bidCode,
+  bidId,
+}: {
+  tender: Tender;
+  bidCode: string;
+  bidId: string;
+}) {
+  const [attachments, setAttachments] = useState<Upload[]>([]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <PublicHeader />
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4 py-10">
+      <div className="flex flex-col items-center min-h-[calc(100vh-64px)] px-4 py-10 gap-6">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-10 max-w-lg w-full text-center">
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5 text-green-600">
             <IconCheck />
@@ -227,6 +240,31 @@ function SuccessState({ tender, bidCode }: { tender: Tender; bidCode: string }) 
             </Link>
           </div>
         </div>
+
+        {/* Bid attachments — optional, after submit */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 max-w-lg w-full">
+          <h3 className="text-sm font-semibold text-slate-700 mb-1">
+            Tài liệu đính kèm <span className="text-slate-400 font-normal">(không bắt buộc)</span>
+          </h3>
+          <p className="text-xs text-slate-400 mb-4">
+            Tải lên catalog, chứng chỉ kỹ thuật hoặc tài liệu bổ sung cho báo giá này.
+          </p>
+          <FileUploadZone
+            entityType="bid"
+            entityId={bidId}
+            purpose="bid_attachment"
+            label="Thêm tài liệu đính kèm"
+            onUploaded={(u) => setAttachments((prev) => [u, ...prev])}
+          />
+          <div className="mt-3">
+            <FileList
+              uploads={attachments}
+              canDelete
+              onDeleted={(id) => setAttachments((prev) => prev.filter((u) => u.id !== id))}
+              emptyText=""
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -247,6 +285,7 @@ export default function SubmitBidPage() {
   const [loading, setLoading] = useState(true);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [savedBidCode, setSavedBidCode] = useState<string | null>(null);
+  const [savedBidId, setSavedBidId] = useState<string | null>(null);
 
   const [header, setHeader] = useState<HeaderForm>({
     deliveryTime: "",
@@ -276,12 +315,12 @@ export default function SubmitBidPage() {
         setTender(adminToPublicTender(found));
 
         if (isEditMode && session && session.kind === "supplier") {
-          // Fetch bid by id and preload form nếu status là "Cần bổ sung"
+          // Fetch bid by id and preload form nếu status là "Cần làm rõ"
           try {
             const res = await fetch(`/api/bids/${encodeURIComponent(editBidId)}`);
             if (res.ok) {
               const { data: bidData } = (await res.json()) as { data: SupplierBid | null };
-              if (bidData && bidData.status === "Cần bổ sung" && bidData.supplierId === session.id) {
+              if (bidData && bidData.status === "Cần làm rõ" && bidData.supplierId === session.id) {
                 setEditingBid(bidData);
                 setHeader({
                   deliveryTime: bidData.deliveryTime ?? "",
@@ -349,13 +388,13 @@ export default function SubmitBidPage() {
 
   // Chỉ chặn nếu không phải edit mode hợp lệ
   if (alreadySubmitted && !editingBid) return <AlreadySubmitted tender={tender} />;
-  if (savedBidCode) return <SuccessState tender={tender} bidCode={savedBidCode} />;
+  if (savedBidCode) return <SuccessState tender={tender} bidCode={savedBidCode} bidId={savedBidId ?? ""} />;
 
   const isDeadlineActive = isDateTodayOrFuture(adminTender.deadline);
-  const isReceivingBids = adminTender.status === "Đang mở" || adminTender.status === "Sắp đóng";
+  const isReceivingBids = adminTender.status === "Đang nhận báo giá" || adminTender.status === "Đã đóng";
   const canSubmitBid = isReceivingBids && isDeadlineActive;
 
-  // Trong edit mode ("Cần bổ sung"), cho phép kể cả khi tender đã đóng/hết hạn
+  // Trong edit mode ("Cần làm rõ"), cho phép kể cả khi tender đã đóng/hết hạn
   if (!canSubmitBid && !editingBid) {
     return (
       <div className="min-h-screen bg-slate-50">
@@ -407,10 +446,10 @@ export default function SubmitBidPage() {
       return;
     }
 
-    // Chỉ check tender open/close khi submit mới (không phải edit "Cần bổ sung")
+    // Chỉ check tender open/close khi submit mới (không phải edit "Cần làm rõ")
     if (!editingBid) {
       const freshTender = await getAdminTenderById(adminTender.id);
-      const freshTenderOk = freshTender?.status === "Đang mở" || freshTender?.status === "Sắp đóng";
+      const freshTenderOk = freshTender?.status === "Đang nhận báo giá" || freshTender?.status === "Đã đóng";
       if (!freshTender || !freshTenderOk || !isDateTodayOrFuture(freshTender.deadline)) {
         setGlobalError(
           freshTender && !isDateTodayOrFuture(freshTender.deadline)
@@ -465,10 +504,10 @@ export default function SubmitBidPage() {
     const total = bidItems.reduce((s, item) => s + item.amount, 0);
 
     if (editingBid) {
-      // Edit mode: PUT bid hiện có với status "Đã bổ sung"
+      // Edit mode: PUT bid hiện có với status "Đã phản hồi"
       const updated: SupplierBid = {
         ...editingBid,
-        status: "Đã bổ sung",
+        status: "Đã phản hồi",
         submittedAt: new Date().toISOString(),
         totalAmount: total,
         deliveryTime: header.deliveryTime.trim() || undefined,
@@ -501,6 +540,7 @@ export default function SubmitBidPage() {
         items: bidItems,
       };
       await saveBid(bid);
+      setSavedBidId(bid.id);
       setSavedBidCode(bidCode);
     }
   }
@@ -536,7 +576,7 @@ export default function SubmitBidPage() {
           {/* ── Form ─────────────────────────────────────────────────────── */}
           <div className="lg:col-span-2 flex flex-col gap-5">
 
-            {/* Banner cảnh báo khi edit "Cần bổ sung" */}
+            {/* Banner cảnh báo khi edit "Cần làm rõ" */}
             {isEditMode && editingBid && (
               <div className="flex gap-3 items-start bg-orange-50 border border-orange-200 text-orange-800 rounded-xl p-4 text-sm">
                 <IconAlert />
@@ -793,7 +833,7 @@ export default function SubmitBidPage() {
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-xs text-orange-800">
                 <p className="font-semibold mb-1">Đang cập nhật báo giá</p>
                 <p className="font-mono text-orange-700">{editingBid.bidCode}</p>
-                <p className="text-orange-600 mt-1">Trạng thái: Cần bổ sung</p>
+                <p className="text-orange-600 mt-1">Trạng thái: Cần làm rõ</p>
               </div>
             )}
 

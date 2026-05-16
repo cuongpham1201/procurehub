@@ -2,8 +2,7 @@ import Link from "next/link";
 import type { Tender } from "@/types/tender";
 
 const statusConfig: Record<string, { className: string }> = {
-  "Đang mở": { className: "bg-green-100 text-green-700" },
-  "Sắp đóng": { className: "bg-orange-100 text-orange-700" },
+  "Đang nhận báo giá": { className: "bg-green-100 text-green-700" },
   "Đã đóng": { className: "bg-slate-100 text-slate-500" },
   "Đã có kết quả": { className: "bg-indigo-100 text-indigo-700" },
 };

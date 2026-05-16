@@ -1,9 +1,9 @@
 export type BidStatus =
   | "Đã nộp"
-  | "Chờ xem xét"
-  | "Đang đánh giá"
-  | "Cần bổ sung"
-  | "Đã bổ sung"
+  | "Đang xem xét"
+  | "Cần làm rõ"
+  | "Đã phản hồi"
+  | "Đề xuất chọn"
   | "Được chọn"
   | "Không được chọn";
 
@@ -20,6 +20,12 @@ export interface BidItem {
   origin?: string;
   deliveryTime?: string;
   note?: string;
+  // Phase 2: snapshot fields (captured at submission) + per-line award status
+  itemCode?: string;
+  specificationSnapshot?: string;
+  quantitySnapshot?: number;
+  unitSnapshot?: string;
+  itemStatus?: "pending" | "awarded" | "rejected";
 }
 
 export interface SupplierBid {
@@ -40,6 +46,9 @@ export interface SupplierBid {
   warrantyPolicy?: string;
   note?: string;
   items: BidItem[];
+  // Phase 2: revision tracking
+  revisionNo?: number;
+  parentBidId?: string;
   // Backward compat — old bids in localStorage may have these
   tenderName?: string;
   createdAt?: string;

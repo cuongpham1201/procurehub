@@ -1,5 +1,6 @@
-import { fail, ok } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
@@ -9,7 +10,7 @@ import {
 import { getServerSession } from "@/lib/auth/server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
-import { getBid, listBids, upsertBid } from "@/lib/repositories/procurehub";
+import { getBid, getSupplier, getTender, listBids, upsertBid } from "@/lib/repositories/procurehub";
 import type { SupplierBid } from "@/types/supplierBid";
 import type { ActivityAction } from "@/types/activityLog";
 
@@ -29,17 +30,23 @@ function resolveBidAction(previous: SupplierBid | null, current: SupplierBid): A
 export async function GET(request: Request) {
   try {
     const session = await getServerSession();
+    if (!session) return unauthorized();
+
     const url = new URL(request.url);
     const tenderId = url.searchParams.get("tenderId") ?? undefined;
+    const supplierId = url.searchParams.get("supplierId") ?? undefined;
 
     let bids = await listBids();
 
     // Security: suppliers may only see their own bids — never other suppliers' data
-    if (session?.kind === "supplier") {
+    if (session.kind === "supplier") {
       bids = bids.filter((b) => b.supplierId === session.sub);
+    } else if (supplierId) {
+      // Internal user filtering by specific supplier
+      bids = bids.filter((b) => b.supplierId === supplierId);
     }
 
-    // Optional tender filter (used by public tender detail page)
+    // Optional tender filter (used by admin comparison and supplier tender detail)
     if (tenderId) {
       bids = bids.filter((b) => b.tenderId === tenderId || b.tenderCode === tenderId);
     }
@@ -52,17 +59,59 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) return unauthorized();
+    if (session.kind !== "supplier") return unauthorized("Chỉ nhà cung cấp mới được nộp báo giá");
     const bid = (await request.json()) as SupplierBid;
+
+    // ── Validation ────────────────────────────────────────────────────────────
+    if (!bid.tenderId?.trim())
+      return fail(new Error("Gói thầu không được để trống"), 400);
+
+    // Supplier phải được duyệt mới được nộp báo giá
+    const supplierRecord = await getSupplier(session.sub);
+    if (!supplierRecord || supplierRecord.status !== "Đã duyệt")
+      return forbidden("Tài khoản nhà cung cấp chưa được phê duyệt. Vui lòng chờ phòng mua sắm xét duyệt hồ sơ.");
+
+    // supplierId phải khớp với JWT session — không cho phép submit thay mặt NCC khác
+    if (bid.supplierId && bid.supplierId !== session.sub)
+      return forbidden("Không có quyền nộp báo giá thay nhà cung cấp khác");
+
+    // Nếu update bid cũ, kiểm tra ownership
+    if (bid.id) {
+      const existing = await getBid(bid.id);
+      if (existing && existing.supplierId !== session.sub)
+        return forbidden("Không có quyền chỉnh sửa báo giá này");
+    }
+
+    // Gói thầu phải đang nhận báo giá
+    const tender = await getTender(bid.tenderId);
+    if (!tender)
+      return fail(new Error("Gói thầu không tồn tại"), 404);
+    if (tender.status !== "Đang nhận báo giá")
+      return fail(new Error(`Gói thầu hiện không nhận báo giá (trạng thái: ${tender.status})`), 400);
+
+    // Kiểm tra deadline
+    if (tender.deadline) {
+      const deadline = new Date(tender.deadline);
+      if (!isNaN(deadline.getTime()) && deadline < new Date())
+        return fail(new Error("Gói thầu đã hết hạn nộp báo giá"), 400);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Gán supplierId từ session — không tin giá trị client gửi lên
+    const bidToSave: SupplierBid = { ...bid, supplierId: session.sub };
+
     const previous = bid.id ? await getBid(bid.id) : null;
-    const saved = await upsertBid(bid);
+    const saved = await upsertBid(bidToSave);
     const action = resolveBidAction(previous, saved);
     await logActivitySafe({
-      ...withActorFallback(getActorFromRequest(request), {
+      ...withActorFallback(getActorFromRequest(request), withActorFallback(actorFromSession(session), {
         actorId: saved.supplierId,
         actorType: "supplier",
         actorName: saved.supplierName,
         actorEmail: saved.supplierEmail,
-      }),
+      })),
       entityType: "bid",
       entityId: saved.id,
       entityName: saved.bidCode,

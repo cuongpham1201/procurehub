@@ -1,5 +1,6 @@
-import { fail, ok } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
@@ -15,8 +16,8 @@ import { NotificationType } from "@/lib/notifications/types";
 import { getSupplier, upsertSupplier } from "@/lib/repositories/procurehub";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { ActivityAction } from "@/types/activityLog";
-import { cookies } from "next/headers";
-import { COOKIE_NAME, verifySession } from "@/lib/auth/session";
+import { getServerSession } from "@/lib/auth/server";
+import { hasPermission } from "@/lib/auth/rbac";
 
 const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
@@ -34,7 +35,11 @@ function resolveSupplierAction(previous: SupplierAccount | null, current: Suppli
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession();
+    if (!session) return unauthorized();
     const { id } = await params;
+    // Supplier chỉ xem được record của chính mình
+    if (session.kind === "supplier" && session.sub !== id) return forbidden();
     return ok(await getSupplier(id));
   } catch (error) {
     return fail(error);
@@ -43,18 +48,34 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession();
+    if (!session) return unauthorized();
+
     const { id } = await params;
     const supplier = (await request.json()) as SupplierAccount;
     const previous = await getSupplier(id);
+
+    // ── RBAC ─────────────────────────────────────────────────────────────────
+    if (session.kind === "supplier") {
+      // Supplier chỉ cập nhật được profile của chính mình
+      if (session.sub !== id) return forbidden("Không có quyền cập nhật hồ sơ nhà cung cấp khác");
+      // Supplier không được tự thay đổi status
+      if (previous && supplier.status !== previous.status)
+        return forbidden("Không có quyền thay đổi trạng thái tài khoản");
+    } else {
+      // Internal user — kiểm tra permission
+      const isStatusChange = previous && supplier.status !== previous.status;
+      if (isStatusChange && !hasPermission(session.role, "suppliers:approve"))
+        return forbidden(`Vai trò "${session.role}" không có quyền thay đổi trạng thái nhà cung cấp`);
+      if (!isStatusChange && !hasPermission(session.role, "suppliers:write"))
+        return forbidden(`Vai trò "${session.role}" không có quyền chỉnh sửa nhà cung cấp`);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const saved = await upsertSupplier({ ...supplier, id });
     const action = resolveSupplierAction(previous, saved);
     await logActivitySafe({
-      ...withActorFallback(getActorFromRequest(request), {
-        actorId: saved.id,
-        actorType: "supplier",
-        actorName: saved.companyName,
-        actorEmail: saved.email,
-      }),
+      ...withActorFallback(getActorFromRequest(request), actorFromSession(session)),
       entityType: "supplier",
       entityId: saved.id,
       entityName: saved.companyName,
@@ -69,11 +90,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       oldValues: snapshot(previous),
       newValues: snapshot(saved),
     });
-    // Xác định caller là supplier hay internal để phân biệt luồng thông báo
-    const cookieStore = await cookies();
-    const token = cookieStore.get(COOKIE_NAME)?.value;
-    const callerSession = token ? await verifySession(token) : null;
-    const callerKind = callerSession?.kind ?? "internal";
+    const callerKind = session.kind;
 
     // Thông báo cho supplier khi admin đổi status
     // Xoá thông báo cũ đã lỗi thời trước khi tạo thông báo mới (tránh trùng lặp)

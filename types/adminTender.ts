@@ -1,9 +1,9 @@
 export type AdminTenderStatus =
   | "Nháp"
-  | "Đang mở"
-  | "Sắp đóng"
+  | "Đang nhận báo giá"
   | "Đã đóng"
   | "Đang đánh giá"
+  | "Chờ phê duyệt"
   | "Đã có kết quả"
   | "Đã hủy";
 

@@ -1,12 +1,17 @@
-import { fail, ok } from "@/lib/api";
+import { fail, ok, unauthorized } from "@/lib/api";
 import {
+  actorFromSession,
   describeActivity,
   getActorFromRequest,
   logActivitySafe,
   snapshot,
   withActorFallback,
 } from "@/lib/activity-log";
-import { createNotificationSafe, notifyInternalByRolesSafe } from "@/lib/notifications/service";
+import { getServerSession } from "@/lib/auth/server";
+import {
+  createNotificationDedupedSafe,
+  notifyInternalByRolesSafe,
+} from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import { deleteBidRecord, getBid, upsertBid } from "@/lib/repositories/procurehub";
 import type { SupplierBid } from "@/types/supplierBid";
@@ -20,15 +25,21 @@ function resolveBidAction(previous: SupplierBid | null, current: SupplierBid): A
   if (!previous) return "submitted";
   if (previous.status !== current.status) {
     if (current.status === "Được chọn") return "awarded";
+    if (current.status === "Cần làm rõ") return "clarification_requested";
     return "evaluated";
   }
   return "updated";
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession();
+    if (!session) return unauthorized();
     const { id } = await params;
-    return ok(await getBid(id));
+    const bid = await getBid(id);
+    // Supplier may only read their own bid
+    if (session.kind === "supplier" && bid?.supplierId !== session.sub) return unauthorized();
+    return ok(bid);
   } catch (error) {
     return fail(error);
   }
@@ -36,18 +47,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession();
+    if (!session) return unauthorized();
     const { id } = await params;
     const bid = (await request.json()) as SupplierBid;
     const previous = await getBid(id);
+    // Supplier may only update their own bid; internal users can update any
+    if (session.kind === "supplier" && previous?.supplierId !== session.sub) return unauthorized();
     const saved = await upsertBid({ ...bid, id });
     const action = resolveBidAction(previous, saved);
     await logActivitySafe({
-      ...withActorFallback(getActorFromRequest(request), {
+      ...withActorFallback(getActorFromRequest(request), withActorFallback(actorFromSession(session), {
         actorId: saved.supplierId,
         actorType: "supplier",
         actorName: saved.supplierName,
         actorEmail: saved.supplierEmail,
-      }),
+      })),
       entityType: "bid",
       entityId: saved.id,
       entityName: saved.bidCode,
@@ -65,7 +80,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       oldValues: snapshot(previous),
       newValues: snapshot(saved),
     });
-    if (previous?.status === "Cần bổ sung" && saved.status === "Đã bổ sung") {
+    if (action === "revision_requested" && saved.supplierId) {
+      // Notify the supplier that their bid needs revision
+      await createNotificationDedupedSafe({
+        userId: saved.supplierId, userKind: "supplier",
+        type: NotificationType.BID_NEED_MORE_INFO,
+        title: "Báo giá cần bổ sung thông tin",
+        message: `Báo giá ${saved.bidCode} cho gói thầu ${saved.tenderCode ?? saved.tenderTitle} cần được bổ sung. Vui lòng cập nhật và gửi lại báo giá.`,
+        link: `/supplier/submit-bid?tenderId=${saved.tenderId}&edit=${saved.id}`,
+        metadata: { bidId: saved.id, bidCode: saved.bidCode, tenderCode: saved.tenderCode, tenderId: saved.tenderId },
+      });
+    } else if (previous?.status === "Cần làm rõ" && saved.status === "Đã phản hồi") {
       await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
         type: NotificationType.BID_SUBMITTED,
         title: "Nhà cung cấp đã cập nhật báo giá",
@@ -73,25 +98,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         link: `/admin/bids/${saved.id}`,
         metadata: { bidId: saved.id, bidCode: saved.bidCode, tenderCode: saved.tenderCode, supplierId: saved.supplierId },
       });
-    } else if (action === "awarded" && saved.supplierId) {
-      await createNotificationSafe({
-        userId: saved.supplierId, userKind: "supplier",
-        type: NotificationType.BID_AWARDED,
-        title: "Báo giá được chọn!",
-        message: `Chúc mừng! Báo giá ${saved.bidCode} của bạn cho gói thầu ${saved.tenderCode ?? saved.tenderTitle} đã được chọn.`,
-        link: "/supplier/bids",
-        metadata: { bidId: saved.id, bidCode: saved.bidCode, tenderCode: saved.tenderCode },
-      });
-    } else if (action === "evaluated" && saved.supplierId && saved.status === "Không được chọn") {
-      await createNotificationSafe({
-        userId: saved.supplierId, userKind: "supplier",
-        type: NotificationType.BID_REJECTED,
-        title: "Báo giá không được chọn",
-        message: `Báo giá ${saved.bidCode} của bạn cho gói thầu ${saved.tenderCode ?? saved.tenderTitle} không được chọn lần này. Cảm ơn bạn đã tham gia.`,
-        link: "/supplier/bids",
-        metadata: { bidId: saved.id, bidCode: saved.bidCode, tenderCode: saved.tenderCode },
-      });
     }
+    // Note: BID_AWARDED and BID_REJECTED notifications are sent exclusively
+    // by /api/award-items/finalize to avoid duplicates when batch-finalizing.
     return ok(saved);
   } catch (error) {
     return fail(error);
@@ -100,17 +109,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession();
+    if (!session) return unauthorized();
     const { id } = await params;
     const previous = await getBid(id);
+    // Supplier may only delete their own bid; internal users can delete any
+    if (session.kind === "supplier" && previous?.supplierId !== session.sub) return unauthorized();
     await deleteBidRecord(id);
     if (previous) {
       await logActivitySafe({
-        ...withActorFallback(getActorFromRequest(request), {
+        ...withActorFallback(getActorFromRequest(request), withActorFallback(actorFromSession(session), {
           actorId: previous.supplierId,
           actorType: "supplier",
           actorName: previous.supplierName,
           actorEmail: previous.supplierEmail,
-        }),
+        })),
         entityType: "bid",
         entityId: previous.id,
         entityName: previous.bidCode,

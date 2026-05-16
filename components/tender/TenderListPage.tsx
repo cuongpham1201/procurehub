@@ -5,9 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getTenders, ensureTenderSeedData, adminToPublicTender } from "@/services/tenderStorage";
 import { ensureCategorySeedData, getPurchaseCategories } from "@/services/categoryStorage";
-import { getInternalSession } from "@/services/authStorage";
-import { getCurrentSession } from "@/services/supplierAccountStorage";
-import { getBidsBySupplier } from "@/services/supplierBidStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { getBids } from "@/services/supplierBidStorage";
 import type { Tender, TenderCategory, TenderStatus } from "@/types/tender";
 import type { PurchaseCategory } from "@/types/category";
 import TenderCard from "./TenderCard";
@@ -19,14 +18,13 @@ type UserType = "loading" | "guest" | "supplier" | "internal";
 
 const STATUSES_OPEN: Array<{ value: TenderStatus | ""; label: string }> = [
   { value: "", label: "Tất cả trạng thái" },
-  { value: "Đang mở", label: "Đang mở" },
-  { value: "Sắp đóng", label: "Sắp đóng" },
+  { value: "Đang nhận báo giá", label: "Đang nhận báo giá" },
+  { value: "Đã đóng", label: "Đã đóng" },
 ];
 
 const STATUSES_ALL: Array<{ value: TenderStatus | ""; label: string }> = [
   { value: "", label: "Tất cả trạng thái" },
-  { value: "Đang mở", label: "Đang mở" },
-  { value: "Sắp đóng", label: "Sắp đóng" },
+  { value: "Đang nhận báo giá", label: "Đang nhận báo giá" },
   { value: "Đã đóng", label: "Đã đóng" },
   { value: "Đã có kết quả", label: "Đã có kết quả" },
 ];
@@ -116,43 +114,44 @@ export default function TenderListPage() {
   const [categoryOptions, setCategoryOptions] = useState<PurchaseCategory[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [userType, setUserType] = useState<UserType>("loading");
+  const { user, loading: userLoading } = useCurrentUser();
 
   useEffect(() => {
     setSearch(searchParams.get("q") ?? "");
   }, [searchParams]);
 
   useEffect(() => {
+    if (userLoading) return; // wait for JWT session before deciding visible tender set
+
     ensureCategorySeedData();
     ensureTenderSeedData();
     async function loadData() {
       const categories = await getPurchaseCategories();
       setCategoryOptions(categories.filter((item) => item.status === "Hoạt động"));
 
-      const internalUser = getInternalSession();
-      const supplierUser = getCurrentSession();
-
       const allAdmin = (await getTenders()).filter(
         (t) => t.status !== "Nháp" && t.status !== "Đã hủy"
       );
 
-      if (internalUser) {
+      if (user?.kind === "internal") {
         setUserType("internal");
         setTenders(allAdmin.map(adminToPublicTender));
-      } else if (supplierUser) {
+      } else if (user?.kind === "supplier") {
         setUserType("supplier");
-        const bids = await getBidsBySupplier(supplierUser.id);
+        // GET /api/bids already filters to the current supplier's bids via JWT session
+        const bids = await getBids();
         const bidTenderIds = new Set(bids.map((b) => b.tenderId));
         const visible = allAdmin.filter(
           (t) =>
-            t.status === "Đang mở" ||
-            t.status === "Sắp đóng" ||
+            t.status === "Đang nhận báo giá" ||
+            t.status === "Đã đóng" ||
             bidTenderIds.has(t.id)
         );
         setTenders(visible.map(adminToPublicTender));
       } else {
         setUserType("guest");
         const visible = allAdmin.filter(
-          (t) => t.status === "Đang mở" || t.status === "Sắp đóng"
+          (t) => t.status === "Đang nhận báo giá" || t.status === "Đã đóng"
         );
         setTenders(visible.map(adminToPublicTender));
       }
@@ -160,7 +159,7 @@ export default function TenderListPage() {
       setLoaded(true);
     }
     loadData();
-  }, []);
+  }, [user, userLoading]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();

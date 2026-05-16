@@ -79,7 +79,7 @@ const GUIDE_DATA: Record<RoleKey, GuideSection> = {
         title: "6. Xem báo giá và kết quả",
         items: [
           "Vào /supplier/bids để xem các báo giá đã nộp.",
-          "Theo dõi trạng thái: Đã nộp, Đang đánh giá, Cần bổ sung, Được chọn hoặc Không được chọn.",
+          "Theo dõi trạng thái: Đã nộp, Đang đánh giá, Cần làm rõ, Được chọn hoặc Không được chọn.",
           "Nếu báo giá được chọn, hệ thống hiển thị badge Được chọn.",
         ],
       },
@@ -123,8 +123,8 @@ const GUIDE_DATA: Record<RoleKey, GuideSection> = {
         title: "3. Vòng đời gói thầu",
         items: [
           "Nháp: chưa public cho nhà cung cấp.",
-          "Đang mở: nhà cung cấp đã duyệt được nộp báo giá.",
-          "Sắp đóng: gói đang mở còn không quá 3 ngày đến hạn nộp.",
+          "Đang nhận báo giá: nhà cung cấp đã duyệt được nộp báo giá.",
+          "Đã đóng: gói đang mở còn không quá 3 ngày đến hạn nộp.",
           "Đã đóng: dừng nhận báo giá.",
           "Đang đánh giá: admin so sánh báo giá.",
           "Đã có kết quả: đã chọn nhà cung cấp.",
@@ -135,7 +135,7 @@ const GUIDE_DATA: Record<RoleKey, GuideSection> = {
         title: "4. Tự động đóng thầu và sắp đóng",
         items: [
           "Nếu hạn nộp nhỏ hơn hôm nay, gói đang mở hoặc sắp đóng tự chuyển sang Đã đóng.",
-          "Nếu hạn nộp còn từ 0 đến 3 ngày, gói tự chuyển sang Sắp đóng.",
+          "Nếu hạn nộp còn từ 0 đến 3 ngày, gói tự chuyển sang Đã đóng.",
           "Admin có thể mở lại gói đã đóng bằng hạn nộp mới nếu cần.",
         ],
       },
@@ -337,7 +337,7 @@ function MockMetric({ label, value, tone = "navy" }: { label: string; value: str
 function BrowserMockup({ title, role }: { title: string; role: RoleKey }) {
   const rowsByRole: Record<RoleKey, string[]> = {
     supplier: ["GT-2026-001", "Đã nộp", "Đang đánh giá"],
-    admin: ["GT-2026-004", "Sắp đóng", "3 báo giá"],
+    admin: ["GT-2026-004", "Đã đóng", "3 báo giá"],
     khvt: ["GT-2026-006", "Đang đánh giá", "So sánh"],
     viewer: ["GT-2026-011", "Đã có kết quả", "Chỉ xem"],
   };
@@ -353,7 +353,7 @@ function BrowserMockup({ title, role }: { title: string; role: RoleKey }) {
       <div className="bg-slate-50/70 p-5">
         <div className="mb-4 grid grid-cols-3 gap-3">
           <MockMetric label={role === "supplier" ? "Hồ sơ" : "Gói thầu"} value={role === "supplier" ? "Đã duyệt" : "12"} tone="navy" />
-          <MockMetric label={role === "admin" ? "Sắp đóng" : "Báo giá"} value={role === "admin" ? "3" : "5"} tone="gold" />
+          <MockMetric label={role === "admin" ? "Đã đóng" : "Báo giá"} value={role === "admin" ? "3" : "5"} tone="gold" />
           <MockMetric label={role === "viewer" ? "Theo dõi" : "Kết quả"} value={role === "viewer" ? "Read" : "2"} tone="green" />
         </div>
         <div className="rounded-xl border border-slate-100 bg-white p-4">

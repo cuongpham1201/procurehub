@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { query, withTransaction } from "@/lib/db";
 import type { AdminTender } from "@/types/adminTender";
 import type {
@@ -10,6 +11,9 @@ import type { MaterialItem, PurchaseCategory } from "@/types/category";
 import type { InternalUser } from "@/types/internalUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { SupplierBid } from "@/types/supplierBid";
+import type { AwardItem, UpsertAwardItemInput } from "@/types/awardItem";
+import type { BidClarification } from "@/types/bidClarification";
+import type { Upload, UploadInput } from "@/types/upload";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -66,6 +70,9 @@ type BidRow = {
   updated_at: string | Date | null;
   raw_data: JsonRecord;
   items?: BidItemRow[];
+  // Phase 2 columns (nullable for backward compat)
+  revision_no: number | null;
+  parent_bid_id: string | null;
 };
 
 type BidItemRow = {
@@ -83,6 +90,28 @@ type BidItemRow = {
   delivery_time: string | null;
   note: string | null;
   raw_data: JsonRecord;
+  // Phase 2 columns (nullable for backward compat with rows inserted before migration 005)
+  item_code: string | null;
+  specification_snapshot: string | null;
+  quantity_snapshot: string | number | null;
+  unit_snapshot: string | null;
+  item_status: string | null;
+};
+
+type AwardItemRow = {
+  id: string;
+  tender_id: string;
+  tender_item_id: string;
+  bid_id: string;
+  bid_item_id: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  unit_price: string | number;
+  quantity: string | number;
+  amount: string | number;
+  note: string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
 };
 
 function asIso(value: string | Date | null | undefined): string {
@@ -137,7 +166,7 @@ function tenderFromRow(row: TenderRow): AdminTender {
     code: row.code ?? "",
     title: row.title,
     category: row.category ?? "",
-    status: (row.status ?? "Đang mở") as AdminTender["status"],
+    status: (row.status ?? "Đang nhận báo giá") as AdminTender["status"],
     deadline: asDateInput(row.deadline),
     estimatedValue: asNumber(row.estimated_value),
     description: row.description ?? "",
@@ -166,6 +195,12 @@ function bidItemFromRow(row: BidItemRow) {
     origin: row.origin ?? undefined,
     deliveryTime: row.delivery_time ?? undefined,
     note: row.note ?? undefined,
+    // Phase 2 snapshot + status fields
+    itemCode: row.item_code ?? undefined,
+    specificationSnapshot: row.specification_snapshot ?? undefined,
+    quantitySnapshot: row.quantity_snapshot != null ? asNumber(row.quantity_snapshot) : undefined,
+    unitSnapshot: row.unit_snapshot ?? undefined,
+    itemStatus: (row.item_status as "pending" | "awarded" | "rejected" | null) ?? "pending",
   };
 }
 
@@ -193,6 +228,9 @@ function bidFromRow(row: BidRow): SupplierBid {
     warrantyPolicy: row.warranty_policy ?? undefined,
     note: row.note ?? undefined,
     items: (row.items ?? []).map(bidItemFromRow),
+    // Phase 2 revision fields
+    revisionNo: row.revision_no ?? 0,
+    parentBidId: row.parent_bid_id ?? undefined,
   };
 }
 
@@ -205,6 +243,7 @@ export async function listSuppliers(): Promise<SupplierAccount[]> {
     email: string | null;
     phone: string | null;
     password: string | null;
+    password_hash: string | null;
     profile_completed: boolean | null;
     status: string | null;
     address: string | null;
@@ -226,6 +265,7 @@ export async function listSuppliers(): Promise<SupplierAccount[]> {
     email: row.email ?? "",
     phone: row.phone ?? "",
     password: row.password ?? "",
+    password_hash: row.password_hash ?? undefined,
     profileCompleted: Boolean(row.profile_completed),
     status: row.status ?? "",
     createdAt: asIso(row.created_at),
@@ -242,16 +282,51 @@ export async function getSupplier(id: string): Promise<SupplierAccount | null> {
   return suppliers.find((supplier) => supplier.id === id) ?? null;
 }
 
+/**
+ * Kiểm tra trùng lặp email / taxCode / phone trực tiếp tại DB.
+ * Dùng cho supplier registration validation — không fetch toàn bộ danh sách.
+ * excludeId: bỏ qua record của chính supplier khi update profile.
+ */
+export async function checkSupplierDuplicates(params: {
+  email?: string;
+  taxCode?: string;
+  phone?: string;
+  excludeId?: string;
+}): Promise<{ emailExists: boolean; taxCodeExists: boolean; phoneExists: boolean }> {
+  const { email, taxCode, phone, excludeId } = params;
+
+  const checkField = async (field: string, value: string | undefined): Promise<boolean> => {
+    if (!value?.trim()) return false;
+    const res = await query<{ exists: boolean }>(
+      `SELECT EXISTS(
+        SELECT 1 FROM suppliers
+        WHERE lower(${field}) = lower($1)
+        ${excludeId ? "AND id <> $2" : ""}
+      ) AS exists`,
+      excludeId ? [value.trim(), excludeId] : [value.trim()],
+    );
+    return res.rows[0]?.exists ?? false;
+  };
+
+  const [emailExists, taxCodeExists, phoneExists] = await Promise.all([
+    checkField("email", email),
+    checkField("tax_code", taxCode),
+    checkField("phone", phone),
+  ]);
+
+  return { emailExists, taxCodeExists, phoneExists };
+}
+
 export async function upsertSupplier(account: SupplierAccount): Promise<SupplierAccount> {
   await query(
     `insert into suppliers (
-      id, company_name, tax_code, contact_name, email, phone, password,
+      id, company_name, tax_code, contact_name, email, phone, password, password_hash,
       profile_completed, status, address, province, website,
       business_description, categories, created_at, updated_at, raw_data
     ) values (
-      $1, $2, $3, $4, $5, $6, $7,
-      $8, $9, $10, $11, $12,
-      $13, $14::jsonb, $15, now(), $16::jsonb
+      $1, $2, $3, $4, $5, $6, $7, $8,
+      $9, $10, $11, $12, $13,
+      $14, $15::jsonb, $16, now(), $17::jsonb
     )
     on conflict (id) do update set
       company_name = excluded.company_name,
@@ -260,6 +335,7 @@ export async function upsertSupplier(account: SupplierAccount): Promise<Supplier
       email = excluded.email,
       phone = excluded.phone,
       password = excluded.password,
+      password_hash = excluded.password_hash,
       profile_completed = excluded.profile_completed,
       status = excluded.status,
       address = excluded.address,
@@ -277,6 +353,7 @@ export async function upsertSupplier(account: SupplierAccount): Promise<Supplier
       account.email,
       account.phone,
       account.password,
+      account.password_hash ?? null,
       account.profileCompleted,
       account.status,
       account.address ?? null,
@@ -292,6 +369,11 @@ export async function upsertSupplier(account: SupplierAccount): Promise<Supplier
 }
 
 export async function listTenders(): Promise<AdminTender[]> {
+  // Auto-close tenders whose deadline has passed (server-side, idempotent)
+  await query(
+    `UPDATE tenders SET status = 'Đã đóng', updated_at = NOW()
+     WHERE status = 'Đang nhận báo giá' AND deadline < CURRENT_DATE`,
+  ).catch(() => {/* non-fatal */});
   const tenders = await query<TenderRow>("select * from tenders order by created_at desc, code asc");
   const items = await query<TenderItemRow>("select * from tender_items order by tender_id asc, sort_order asc, id asc");
   const itemMap = new Map<string, TenderItemRow[]>();
@@ -398,6 +480,22 @@ export async function getBid(id: string): Promise<SupplierBid | null> {
   return bids.find((bid) => bid.id === id) ?? null;
 }
 
+export async function nextBidCode(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `BG-${year}-`;
+  const res = await query<{ bid_code: string }>(
+    `SELECT bid_code FROM bids
+     WHERE bid_code LIKE $1
+     ORDER BY bid_code DESC
+     LIMIT 1`,
+    [`${prefix}%`],
+  );
+  const last = res.rows[0]?.bid_code ?? null;
+  const lastNum = last ? parseInt(last.slice(prefix.length), 10) : 0;
+  const next = isNaN(lastNum) ? 1 : lastNum + 1;
+  return `${prefix}${String(next).padStart(3, "0")}`;
+}
+
 export async function upsertBid(bid: SupplierBid): Promise<SupplierBid> {
   return withTransaction(async (txQuery) => {
     await txQuery(
@@ -405,12 +503,14 @@ export async function upsertBid(bid: SupplierBid): Promise<SupplierBid> {
         id, bid_code, tender_id, tender_code, tender_title, supplier_id,
         supplier_name, supplier_email, supplier_phone, status, submitted_at,
         total_amount, delivery_time, payment_terms, warranty_policy, note,
+        revision_no, parent_bid_id,
         created_at, updated_at, raw_data
       ) values (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         $12, $13, $14, $15, $16,
-        $17, now(), $18::jsonb
+        $17, $18,
+        $19, now(), $20::jsonb
       )
       on conflict (id) do update set
         bid_code = excluded.bid_code,
@@ -428,6 +528,8 @@ export async function upsertBid(bid: SupplierBid): Promise<SupplierBid> {
         payment_terms = excluded.payment_terms,
         warranty_policy = excluded.warranty_policy,
         note = excluded.note,
+        revision_no = excluded.revision_no,
+        parent_bid_id = excluded.parent_bid_id,
         updated_at = now(),
         raw_data = excluded.raw_data`,
       [
@@ -447,6 +549,8 @@ export async function upsertBid(bid: SupplierBid): Promise<SupplierBid> {
         bid.paymentTerms ?? null,
         bid.warrantyPolicy ?? null,
         bid.note ?? null,
+        bid.revisionNo ?? 0,
+        bid.parentBidId ?? null,
         bid.createdAt ?? bid.submittedAt ?? new Date().toISOString(),
         JSON.stringify(bid),
       ],
@@ -457,11 +561,13 @@ export async function upsertBid(bid: SupplierBid): Promise<SupplierBid> {
         `insert into bid_items (
           id, bid_id, tender_item_id, item_name, specification, quantity,
           unit, unit_price, amount, brand, origin, delivery_time, note,
+          item_code, specification_snapshot, quantity_snapshot, unit_snapshot,
           sort_order, raw_data
         ) values (
           $1, $2, $3, $4, $5, $6,
           $7, $8, $9, $10, $11, $12, $13,
-          $14, $15::jsonb
+          $14, $15, $16, $17,
+          $18, $19::jsonb
         )`,
         [
           item.id,
@@ -477,6 +583,10 @@ export async function upsertBid(bid: SupplierBid): Promise<SupplierBid> {
           item.origin ?? null,
           item.deliveryTime ?? null,
           item.note ?? null,
+          item.itemCode ?? null,
+          item.specificationSnapshot ?? item.specification ?? null,
+          item.quantitySnapshot ?? item.quantity ?? null,
+          item.unitSnapshot ?? item.unit ?? null,
           index,
           JSON.stringify(item),
         ],
@@ -765,6 +875,275 @@ export async function listActivityLogs(
   };
 }
 
+// ── Award items ───────────────────────────────────────────────────────────────
+
+function awardItemFromRow(row: AwardItemRow): AwardItem {
+  return {
+    id: row.id,
+    tenderId: row.tender_id,
+    tenderItemId: row.tender_item_id,
+    bidId: row.bid_id,
+    bidItemId: row.bid_item_id ?? undefined,
+    supplierId: row.supplier_id ?? undefined,
+    supplierName: row.supplier_name ?? undefined,
+    unitPrice: asNumber(row.unit_price),
+    quantity: asNumber(row.quantity),
+    amount: asNumber(row.amount),
+    note: row.note ?? undefined,
+    createdAt: asIso(row.created_at),
+    updatedAt: asIso(row.updated_at),
+  };
+}
+
+export async function listAwardItems(tenderId: string): Promise<AwardItem[]> {
+  const result = await query<AwardItemRow>(
+    "select * from award_items where tender_id = $1 order by created_at asc",
+    [tenderId],
+  );
+  return result.rows.map(awardItemFromRow);
+}
+
+export async function upsertAwardItem(input: UpsertAwardItemInput): Promise<AwardItem> {
+  const id = `AWD-${randomUUID()}`;
+  const result = await query<AwardItemRow>(
+    `insert into award_items (
+      id, tender_id, tender_item_id, bid_id, bid_item_id,
+      supplier_id, supplier_name, unit_price, quantity, amount, note,
+      created_at, updated_at
+    ) values (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8, $9, $10, $11,
+      now(), now()
+    )
+    on conflict (tender_item_id) do update set
+      bid_id        = excluded.bid_id,
+      bid_item_id   = excluded.bid_item_id,
+      supplier_id   = excluded.supplier_id,
+      supplier_name = excluded.supplier_name,
+      unit_price    = excluded.unit_price,
+      quantity      = excluded.quantity,
+      amount        = excluded.amount,
+      note          = excluded.note,
+      updated_at    = now()
+    returning *`,
+    [
+      id,
+      input.tenderId,
+      input.tenderItemId,
+      input.bidId,
+      input.bidItemId ?? null,
+      input.supplierId ?? null,
+      input.supplierName ?? null,
+      input.unitPrice,
+      input.quantity,
+      input.amount,
+      input.note ?? null,
+    ],
+  );
+  return awardItemFromRow(result.rows[0]);
+}
+
+export async function deleteAwardItem(id: string): Promise<void> {
+  await query("delete from award_items where id = $1", [id]);
+}
+
+export async function deleteAwardItemByTenderItem(tenderItemId: string): Promise<void> {
+  await query("delete from award_items where tender_item_id = $1", [tenderItemId]);
+}
+
+// ── Bid Clarifications ────────────────────────────────────────────────────────
+
+type ClarificationRow = {
+  id: string;
+  bid_id: string;
+  tender_id: string;
+  requested_by: string;
+  requested_by_name: string;
+  request_note: string;
+  requested_at: string | Date;
+  responded_by: string | null;
+  responded_by_name: string | null;
+  response_note: string | null;
+  responded_at: string | Date | null;
+  status: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+function clarificationFromRow(row: ClarificationRow): BidClarification {
+  return {
+    id: row.id,
+    bidId: row.bid_id,
+    tenderId: row.tender_id,
+    requestedBy: row.requested_by,
+    requestedByName: row.requested_by_name,
+    requestNote: row.request_note,
+    requestedAt: asIso(row.requested_at),
+    respondedBy: row.responded_by ?? undefined,
+    respondedByName: row.responded_by_name ?? undefined,
+    responseNote: row.response_note ?? undefined,
+    respondedAt: row.responded_at ? asIso(row.responded_at) : undefined,
+    status: row.status as "pending" | "responded",
+    createdAt: asIso(row.created_at),
+    updatedAt: asIso(row.updated_at),
+  };
+}
+
+export async function listBidClarifications(bidId: string): Promise<BidClarification[]> {
+  const result = await query<ClarificationRow>(
+    "SELECT * FROM bid_clarifications WHERE bid_id = $1 ORDER BY created_at ASC",
+    [bidId],
+  );
+  return result.rows.map(clarificationFromRow);
+}
+
+export async function createBidClarification(input: {
+  bidId: string;
+  tenderId: string;
+  requestedBy: string;
+  requestedByName: string;
+  requestNote: string;
+}): Promise<BidClarification> {
+  const id = randomUUID();
+  const result = await query<ClarificationRow>(
+    `INSERT INTO bid_clarifications (id, bid_id, tender_id, requested_by, requested_by_name, request_note)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [id, input.bidId, input.tenderId, input.requestedBy, input.requestedByName, input.requestNote],
+  );
+  // Đồng thời đổi bid status → "Cần làm rõ"
+  await query(
+    "UPDATE bids SET status = 'Cần làm rõ', updated_at = now() WHERE id = $1",
+    [input.bidId],
+  );
+  return clarificationFromRow(result.rows[0]);
+}
+
+export async function respondToBidClarification(
+  clarificationId: string,
+  respondedBy: string,
+  respondedByName: string,
+  responseNote: string,
+): Promise<BidClarification> {
+  const result = await query<ClarificationRow>(
+    `UPDATE bid_clarifications
+     SET responded_by = $1, responded_by_name = $2, response_note = $3,
+         responded_at = now(), status = 'responded', updated_at = now()
+     WHERE id = $4 RETURNING *`,
+    [respondedBy, respondedByName, responseNote, clarificationId],
+  );
+  if (!result.rows[0]) throw new Error("Clarification không tồn tại");
+  const row = result.rows[0];
+  // Đồng thời đổi bid status → "Đã phản hồi"
+  await query(
+    "UPDATE bids SET status = 'Đã phản hồi', updated_at = now() WHERE id = $1",
+    [row.bid_id],
+  );
+  return clarificationFromRow(row);
+}
+
+// ── Propose Awards (KHVT flow) ────────────────────────────────────────────────
+
+/**
+ * KHVT đề xuất kết quả — bids có award items → "Đề xuất chọn",
+ * tender → "Chờ phê duyệt". Trưởng phòng/Admin sẽ finalize sau.
+ */
+export async function proposeAwards(tenderId: string): Promise<void> {
+  await withTransaction(async (txQuery) => {
+    // Lấy danh sách bid_id đã có award items
+    const awardResult = await txQuery<{ bid_id: string }>(
+      "SELECT DISTINCT bid_id FROM award_items WHERE tender_id = $1",
+      [tenderId],
+    );
+    const proposedBidIds = awardResult.rows.map((r) => r.bid_id);
+
+    // Tất cả bids của tender
+    const bidResult = await txQuery<{ id: string }>(
+      "SELECT id FROM bids WHERE tender_id = $1",
+      [tenderId],
+    );
+
+    for (const bid of bidResult.rows) {
+      const isProposed = proposedBidIds.includes(bid.id);
+      const newStatus = isProposed ? "Đề xuất chọn" : "Không được chọn";
+      await txQuery(
+        "UPDATE bids SET status = $1, updated_at = now() WHERE id = $2",
+        [newStatus, bid.id],
+      );
+    }
+
+    // Tender → "Chờ phê duyệt"
+    await txQuery(
+      "UPDATE tenders SET status = 'Chờ phê duyệt', updated_at = now() WHERE id = $1",
+      [tenderId],
+    );
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function finalizeAwards(tenderId: string): Promise<void> {
+  await withTransaction(async (txQuery) => {
+    // 1. Get all award_items for this tender
+    const awardResult = await txQuery<{ bid_id: string; tender_item_id: string; bid_item_id: string | null }>(
+      "select bid_id, tender_item_id, bid_item_id from award_items where tender_id = $1",
+      [tenderId],
+    );
+    const awards = awardResult.rows;
+
+    // Count how many items each bid won
+    const awardCountPerBid = new Map<string, number>();
+    for (const a of awards) {
+      awardCountPerBid.set(a.bid_id, (awardCountPerBid.get(a.bid_id) ?? 0) + 1);
+    }
+
+    const awardedBidItemIds = new Set(
+      awards.map((a) => a.bid_item_id).filter((id): id is string => id !== null),
+    );
+
+    // 2. Get all bids for this tender, including how many items they submitted
+    const bidResult = await txQuery<{ id: string; status: string | null }>(
+      "select id, status from bids where tender_id = $1",
+      [tenderId],
+    );
+
+    // 3. Update each bid status
+    //    Any bid that won at least one item → "Được chọn"
+    //    Bids that won nothing → "Không được chọn"
+    for (const bid of bidResult.rows) {
+      const wonCount = awardCountPerBid.get(bid.id) ?? 0;
+      const newStatus = wonCount > 0 ? "Được chọn" : "Không được chọn";
+      await txQuery(
+        "update bids set status = $1, updated_at = now() where id = $2",
+        [newStatus, bid.id],
+      );
+    }
+
+    // 4. Update bid_items.item_status
+    //    Awarded items → 'awarded'
+    if (awardedBidItemIds.size > 0) {
+      await txQuery(
+        `update bid_items set item_status = 'awarded', updated_at = now()
+         where id = any($1::text[])`,
+        [Array.from(awardedBidItemIds)],
+      );
+    }
+    //    Remaining items for this tender's bids → 'rejected'
+    await txQuery(
+      `update bid_items set item_status = 'rejected', updated_at = now()
+       where bid_id in (
+         select id from bids where tender_id = $1
+       ) and item_status = 'pending'`,
+      [tenderId],
+    );
+
+    // 5. Update tender status to "Đã có kết quả"
+    await txQuery(
+      "update tenders set status = 'Đã có kết quả', updated_at = now() where id = $1",
+      [tenderId],
+    );
+  });
+}
+
 export async function createActivityLog(log: ActivityLog): Promise<ActivityLog> {
   await query(
     `insert into activity_logs (
@@ -805,4 +1184,102 @@ export async function createActivityLog(log: ActivityLog): Promise<ActivityLog> 
     ],
   );
   return log;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Uploads
+// ─────────────────────────────────────────────────────────────────────────────
+
+type UploadRow = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  uploaded_by: string | null;
+  uploaded_by_kind: string | null;
+  filename: string;
+  stored_name: string;
+  mime_type: string | null;
+  size_bytes: string | number | null;
+  purpose: string | null;
+  created_at: string | Date;
+};
+
+function uploadFromRow(row: UploadRow): Upload {
+  return {
+    id: row.id,
+    entityType: row.entity_type as Upload["entityType"],
+    entityId: row.entity_id,
+    uploadedBy: row.uploaded_by ?? undefined,
+    uploadedByKind: (row.uploaded_by_kind as Upload["uploadedByKind"]) ?? undefined,
+    filename: row.filename,
+    storedName: row.stored_name,
+    mimeType: row.mime_type ?? undefined,
+    sizeBytes: row.size_bytes != null ? Number(row.size_bytes) : undefined,
+    purpose: (row.purpose as Upload["purpose"]) ?? undefined,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+  };
+}
+
+export async function listUploads(
+  entityType: string,
+  entityId: string,
+): Promise<Upload[]> {
+  const result = await query<UploadRow>(
+    `SELECT * FROM uploads WHERE entity_type = $1 AND entity_id = $2 ORDER BY created_at ASC`,
+    [entityType, entityId],
+  );
+  return result.rows.map(uploadFromRow);
+}
+
+export async function createUploadRecord(input: UploadInput): Promise<Upload> {
+  const id = randomUUID();
+  const result = await query<UploadRow>(
+    `INSERT INTO uploads
+       (id, entity_type, entity_id, uploaded_by, uploaded_by_kind,
+        filename, stored_name, mime_type, size_bytes, purpose)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING *`,
+    [
+      id,
+      input.entityType,
+      input.entityId,
+      input.uploadedBy ?? null,
+      input.uploadedByKind ?? null,
+      input.filename,
+      input.storedName,
+      input.mimeType ?? null,
+      input.sizeBytes ?? null,
+      input.purpose ?? null,
+    ],
+  );
+  return uploadFromRow(result.rows[0]);
+}
+
+export async function getUpload(id: string): Promise<Upload | null> {
+  const result = await query<UploadRow>(
+    `SELECT * FROM uploads WHERE id = $1`,
+    [id],
+  );
+  return result.rows.length > 0 ? uploadFromRow(result.rows[0]) : null;
+}
+
+export async function deleteUploadRecord(id: string): Promise<void> {
+  await query(`DELETE FROM uploads WHERE id = $1`, [id]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal user email lookup (for email notifications)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getInternalEmailsByRoles(roles: string[]): Promise<string[]> {
+  if (!roles.length) return [];
+  const result = await query<{ email: string }>(
+    `SELECT email FROM internal_users
+     WHERE role = ANY($1::text[]) AND status = 'active' AND email IS NOT NULL AND email <> ''`,
+    [roles],
+  );
+  return result.rows.map((r) => r.email).filter(Boolean);
 }

@@ -24,10 +24,10 @@ function fmtDate(iso: string): string {
 // ── status badge ───────────────────────────────────────────────────────────
 const STATUS_CLS: Record<string, string> = {
   "Đã nộp":          "bg-blue-100 text-blue-700",
-  "Chờ xem xét":     "bg-amber-100 text-amber-700",
+  "Đang xem xét":     "bg-amber-100 text-amber-700",
   "Đang đánh giá":   "bg-indigo-100 text-indigo-700",
-  "Cần bổ sung":     "bg-orange-100 text-orange-700",
-  "Đã bổ sung":      "bg-teal-100 text-teal-700",
+  "Cần làm rõ":     "bg-orange-100 text-orange-700",
+  "Đã phản hồi":      "bg-teal-100 text-teal-700",
   "Được chọn":       "bg-emerald-100 text-emerald-700",
   "Không được chọn": "bg-slate-100 text-slate-500",
 };

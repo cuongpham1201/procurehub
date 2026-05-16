@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { signSession, setSessionCookie } from "@/lib/auth/session";
+import { checkRateLimit, getClientIp } from "@/lib/auth/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,27 @@ interface UserRow {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Rate limiting ─────────────────────────────────────────────────────────
+  // Tối đa 10 lần thử trong 15 phút mỗi IP
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`login:${ip}`, 10);
+  if (!rl.allowed) {
+    const retryAfterSec = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      { error: "Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Limit": "10",
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(rl.resetAt / 1000)),
+        },
+      },
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   let body: LoginBody;
   try {
     body = await req.json();

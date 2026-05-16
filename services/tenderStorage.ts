@@ -10,25 +10,12 @@ import {
 import type { AdminTender, AdminTenderStatus } from "@/types/adminTender";
 import type { Tender, TenderStatus } from "@/types/tender";
 
-const CLOSING_SOON_DAYS = 3;
-
-function daysUntilDate(value: string): number | null {
-  const dateValue = toDateInputValue(value);
-  if (!dateValue) return null;
-  const today = new Date(`${getTodayDateString()}T00:00:00`).getTime();
-  const deadline = new Date(`${dateValue}T00:00:00`).getTime();
-  if (isNaN(today) || isNaN(deadline)) return null;
-  return Math.round((deadline - today) / 86_400_000);
-}
 
 function deadlineStatusForTender(tender: AdminTender): AdminTenderStatus {
-  if (tender.status !== "Đang mở" && tender.status !== "Sắp đóng") {
-    return tender.status;
-  }
+  // Chỉ auto-close khi tender đang nhận báo giá và deadline đã qua
+  if (tender.status !== "Đang nhận báo giá") return tender.status;
   if (isDateBeforeToday(tender.deadline)) return "Đã đóng";
-  const daysLeft = daysUntilDate(tender.deadline);
-  if (daysLeft !== null && daysLeft >= 0 && daysLeft <= CLOSING_SOON_DAYS) return "Sắp đóng";
-  return "Đang mở";
+  return "Đang nhận báo giá";
 }
 
 export async function syncExpiredTenders(): Promise<AdminTender[]> {
@@ -110,7 +97,7 @@ export async function reopenTender(id: string, newDeadline: string): Promise<Adm
   if (!normalizedDeadline || !isDateTodayOrFuture(normalizedDeadline)) return null;
   const updated: AdminTender = {
     ...tender,
-    status: "Đang mở",
+    status: "Đang nhận báo giá",
     deadline: normalizedDeadline,
     updatedAt: new Date().toISOString(),
   };
@@ -143,10 +130,10 @@ export async function resetTenderSeedData(): Promise<void> {
 
 export function adminToPublicTender(t: AdminTender): Tender {
   const statusMap: Record<string, TenderStatus> = {
-    "Đang mở": "Đang mở",
-    "Sắp đóng": "Sắp đóng",
+    "Đang nhận báo giá": "Đang nhận báo giá",
     "Đã đóng": "Đã đóng",
     "Đang đánh giá": "Đã đóng",
+    "Chờ phê duyệt": "Đã đóng",
     "Đã có kết quả": "Đã có kết quả",
   };
   return {

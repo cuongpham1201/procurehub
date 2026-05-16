@@ -1,4 +1,4 @@
-export type TenderStatus = "Đang mở" | "Sắp đóng" | "Đã đóng" | "Đã có kết quả";
+export type TenderStatus = "Đang nhận báo giá" | "Đã đóng" | "Đã có kết quả";
 
 export type TenderCategory = string;
 
