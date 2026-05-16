@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { getBidsBySupplier } from "@/services/supplierBidStorage";
 import type { SupplierBid, BidItem } from "@/types/supplierBid";
 import type { BidClarification } from "@/types/bidClarification";
+import type { Upload } from "@/types/upload";
+import { FileList } from "@/components/ui/FileList";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number): string {
@@ -145,6 +146,7 @@ export default function SupplierBidsPage() {
   const [clarifyResponseNote, setClarifyResponseNote] = useState<Record<string, string>>({});
   const [clarifySubmitting, setClarifySubmitting] = useState<Record<string, boolean>>({});
   const [clarifyError, setClarifyError] = useState<Record<string, string>>({});
+  const [uploadsMap, setUploadsMap] = useState<Record<string, Upload[]>>({});
   const loggedIn = !sessionLoading && session?.kind === "supplier";
   const companyName = session?.name ?? "";
 
@@ -152,8 +154,14 @@ export default function SupplierBidsPage() {
     if (sessionLoading) return;
     async function loadData() {
       if (!session || session.kind !== "supplier") { setLoading(false); return; }
-      const myBids = await getBidsBySupplier(session.id);
-      setBids(myBids.slice().sort((a, b) => (bidDate(b)).localeCompare(bidDate(a))));
+      try {
+        const res = await fetch("/api/bids");
+        const json = await res.json();
+        const myBids: SupplierBid[] = json.data ?? [];
+        setBids(myBids.slice().sort((a, b) => (bidDate(b)).localeCompare(bidDate(a))));
+      } catch {
+        setBids([]);
+      }
       setLoading(false);
     }
     loadData();
@@ -170,10 +178,24 @@ export default function SupplierBidsPage() {
     }
   }
 
+  async function loadUploads(bidId: string) {
+    if (uploadsMap[bidId]) return; // already loaded
+    try {
+      const res = await fetch(`/api/uploads?entityType=bid&entityId=${encodeURIComponent(bidId)}`);
+      const json = await res.json();
+      setUploadsMap((prev) => ({ ...prev, [bidId]: json.data ?? [] }));
+    } catch {
+      setUploadsMap((prev) => ({ ...prev, [bidId]: [] }));
+    }
+  }
+
   function handleExpand(bidId: string, hasClarification: boolean) {
     const next = expandedId === bidId ? null : bidId;
     setExpandedId(next);
-    if (next && hasClarification) loadClarifications(bidId);
+    if (next) {
+      if (hasClarification) loadClarifications(bidId);
+      loadUploads(bidId);
+    }
   }
 
   async function handleRespond(bidId: string, clarificationId: string) {
@@ -321,18 +343,16 @@ export default function SupplierBidsPage() {
                       >
                         Xem gói thầu
                       </Link>
-                      {(itemCount > 0 || needsClarification) && (
-                        <button
-                          onClick={() => handleExpand(bid.id, needsClarification)}
-                          className={`text-xs font-medium border px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap ${
-                            needsClarification
-                              ? "text-orange-600 border-orange-300 hover:bg-orange-50"
-                              : "text-slate-500 border-slate-200"
-                          }`}
-                        >
-                          {isExpanded ? "Thu gọn ▲" : needsClarification ? "Phản hồi ▼" : "Chi tiết ▼"}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleExpand(bid.id, needsClarification)}
+                        className={`text-xs font-medium border px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap ${
+                          needsClarification
+                            ? "text-orange-600 border-orange-300 hover:bg-orange-50"
+                            : "text-slate-500 border-slate-200"
+                        }`}
+                      >
+                        {isExpanded ? "Thu gọn ▲" : needsClarification ? "Phản hồi ▼" : "Chi tiết ▼"}
+                      </button>
                     </div>
                   </div>
 
@@ -429,6 +449,16 @@ export default function SupplierBidsPage() {
                       )}
 
                       {itemCount > 0 && <BidItemsTable items={bid.items} />}
+
+                      {/* File attachments */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 mb-2">Tài liệu đính kèm</p>
+                        <FileList
+                          uploads={uploadsMap[bid.id] ?? []}
+                          canDelete={false}
+                          emptyText={uploadsMap[bid.id] ? "Chưa có tài liệu đính kèm" : "Đang tải..."}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

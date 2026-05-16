@@ -190,6 +190,15 @@ function SuccessState({
 }) {
   const [attachments, setAttachments] = useState<Upload[]>([]);
 
+  // Load any files already uploaded (survives page refresh)
+  useEffect(() => {
+    if (!bidId) return;
+    fetch(`/api/uploads?entityType=bid&entityId=${encodeURIComponent(bidId)}`)
+      .then((r) => r.json())
+      .then((json) => { if (Array.isArray(json.data)) setAttachments(json.data); })
+      .catch(() => {});
+  }, [bidId]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <PublicHeader />

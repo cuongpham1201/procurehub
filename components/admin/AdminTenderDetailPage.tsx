@@ -915,7 +915,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                   </div>
                 </div>
               )}
-              {tender.status === "Đang đánh giá" && bids.length > 0 && (
+              {(tender.status === "Đang đánh giá" || tender.status === "Chờ phê duyệt" || tender.status === "Đã có kết quả") && bids.length > 0 && (
                 <Link
                   href={`/admin/tenders/${tender.id}/comparison`}
                   className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
@@ -926,10 +926,27 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                   So sánh báo giá
                 </Link>
               )}
+              {tender.status === "Đang nhận báo giá" && bids.length > 0 && (
+                <div className="space-y-2">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+                    <p className="font-semibold mb-1">Đã có {bids.length} báo giá</p>
+                    <p className="mb-2">Để so sánh và chọn NCC: <strong>Đóng thầu</strong> → Chuyển sang đánh giá → So sánh báo giá.</p>
+                  </div>
+                  <Link
+                    href={`/admin/tenders/${tender.id}/comparison`}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                    Xem trước so sánh báo giá
+                  </Link>
+                </div>
+              )}
               {tender.status === "Đã đóng" && bids.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
                   <p className="font-semibold mb-0.5">Gói thầu đã đóng – {bids.length} báo giá</p>
-                  <p>Chuyển sang &quot;Đang đánh giá&quot; để so sánh báo giá và chốt nhà cung cấp.</p>
+                  <p>Nhấn &quot;Chuyển sang đang đánh giá&quot; rồi vào &quot;So sánh báo giá&quot; để chọn NCC trúng thầu.</p>
                 </div>
               )}
             </>
