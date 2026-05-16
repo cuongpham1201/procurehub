@@ -9,6 +9,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { SupplierBid } from "@/types/supplierBid";
 import type { Upload } from "@/types/upload";
+import type { PurchaseCategory } from "@/types/category";
 import { FileList } from "@/components/ui/FileList";
 
 // ── permissions ───────────────────────────────────────────────────────────
@@ -66,13 +67,7 @@ function isValidEmail(email: string): boolean {
 
 // ── constants ─────────────────────────────────────────────────────────────
 
-const SUPPLIER_CATEGORIES = [
-  "Nguyên vật liệu",
-  "Máy móc",
-  "Thiết bị",
-  "Công cụ dụng cụ",
-  "Dịch vụ phụ trợ",
-];
+// Categories loaded dynamically from /api/procurement-groups
 
 type ActionKey = "Đã duyệt" | "Yêu cầu bổ sung" | "Từ chối" | "Tạm khóa";
 
@@ -146,6 +141,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
   const [account, setAccount] = useState<SupplierAccount | null | undefined>(undefined);
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [capabilityUploads, setCapabilityUploads] = useState<Upload[]>([]);
+  const [categories, setCategories] = useState<PurchaseCategory[]>([]);
   const [successMsg, setSuccessMsg] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<EditForm | null>(null);
@@ -153,15 +149,18 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
 
   useEffect(() => {
     async function loadData() {
-      const [all, allBids, uploadsRes] = await Promise.all([
+      const [all, allBids, uploadsRes, groupsRes] = await Promise.all([
         getAccounts(),
         getBids(),
         fetch(`/api/uploads?entityType=supplier&entityId=${encodeURIComponent(id)}`).then((r) => r.json()).catch(() => ({ data: [] })),
+        fetch("/api/procurement-groups").then((r) => r.json()).catch(() => ({ data: [] })),
       ]);
       const found = all.find((a) => a.id === id) ?? null;
       setAccount(found);
       setBids(allBids.filter((b) => b.supplierId === id));
       setCapabilityUploads(uploadsRes.data ?? []);
+      const groups: PurchaseCategory[] = groupsRes.data ?? [];
+      setCategories(groups.filter((g) => g.status === "Hoạt động"));
     }
     loadData();
   }, [id]);
@@ -403,15 +402,17 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
                   <div>
                     <label className={labelCls}>Nhóm hàng cung cấp</label>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {SUPPLIER_CATEGORIES.map((cat) => (
-                        <label key={cat} className="flex items-center gap-1.5 cursor-pointer select-none">
+                      {categories.length === 0 ? (
+                        <p className="text-xs text-slate-400">Đang tải danh mục...</p>
+                      ) : categories.map((cat) => (
+                        <label key={cat.id} className="flex items-center gap-1.5 cursor-pointer select-none">
                           <input
                             type="checkbox"
-                            checked={form.categories.includes(cat)}
-                            onChange={() => toggleCategory(cat)}
+                            checked={form.categories.includes(cat.name)}
+                            onChange={() => toggleCategory(cat.name)}
                             className="accent-[#0f2d5e]"
                           />
-                          <span className="text-sm text-slate-700">{cat}</span>
+                          <span className="text-sm text-slate-700">{cat.name}</span>
                         </label>
                       ))}
                     </div>

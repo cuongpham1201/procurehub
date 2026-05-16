@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local file uploads (dev only — production uses UPLOAD_DIR env var)
+/uploads

@@ -7,6 +7,7 @@ import { updateAccount } from "@/services/supplierAccountStorage";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { Upload } from "@/types/upload";
+import type { PurchaseCategory } from "@/types/category";
 import { FileUploadZone } from "@/components/ui/FileUploadZone";
 import { FileList } from "@/components/ui/FileList";
 
@@ -28,13 +29,6 @@ const PROVINCES = [
   "Tỉnh thành khác",
 ];
 
-const CATEGORIES = [
-  "Nguyên vật liệu",
-  "Máy móc",
-  "Thiết bị",
-  "Công cụ dụng cụ",
-  "Dịch vụ phụ trợ",
-];
 
 
 interface ProfileForm {
@@ -81,6 +75,7 @@ export default function SupplierProfilePage() {
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [capabilityDocs, setCapabilityDocs] = useState<Upload[]>([]);
+  const [categories, setCategories] = useState<PurchaseCategory[]>([]);
 
   const [form, setForm] = useState<ProfileForm>({
     address: "",
@@ -99,33 +94,37 @@ export default function SupplierProfilePage() {
       router.replace("/login");
       return;
     }
-    fetch(`/api/suppliers/${session.id}`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((envelope) => {
-        // API trả { data: {...}, error: null } — phải unwrap .data
-        const supplier = envelope?.data ?? envelope;
-        if (!supplier || !supplier.id) return;
-        setAccount(supplier);
-        setForm({
-          address: supplier.address ?? "",
-          province: supplier.province ?? "",
-          website: supplier.website ?? "",
-          businessDescription: supplier.businessDescription ?? "",
-          categories: supplier.categories ?? [],
-          hotline: supplier.hotline ?? "",
-          rfqEmail: supplier.rfqEmail ?? "",
-          quotationContact: supplier.quotationContact ?? "",
-        });
-        setLoading(false);
+    // Load supplier data + categories + uploads in parallel
+    Promise.all([
+      fetch(`/api/suppliers/${session.id}`).then((r) => r.ok ? r.json() : null),
+      fetch("/api/procurement-groups").then((r) => r.ok ? r.json() : null),
+    ]).then(([supplierEnvelope, groupsEnvelope]) => {
+      // Categories — chỉ lấy nhóm đang hoạt động
+      const groups: PurchaseCategory[] = groupsEnvelope?.data ?? [];
+      setCategories(groups.filter((g) => g.status === "Hoạt động"));
 
-        // Load capability documents
-        if (supplier?.id) {
-          fetch(`/api/uploads?entityType=supplier&entityId=${supplier.id}`)
-            .then((r) => r.ok ? r.json() : null)
-            .then((env) => { if (env?.data) setCapabilityDocs(env.data as Upload[]); })
-            .catch(() => {/* silent */});
-        }
+      // Supplier profile
+      const supplier = supplierEnvelope?.data ?? supplierEnvelope;
+      if (!supplier || !supplier.id) { setLoading(false); return; }
+      setAccount(supplier);
+      setForm({
+        address: supplier.address ?? "",
+        province: supplier.province ?? "",
+        website: supplier.website ?? "",
+        businessDescription: supplier.businessDescription ?? "",
+        categories: supplier.categories ?? [],
+        hotline: supplier.hotline ?? "",
+        rfqEmail: supplier.rfqEmail ?? "",
+        quotationContact: supplier.quotationContact ?? "",
       });
+      setLoading(false);
+
+      // Load capability documents
+      fetch(`/api/uploads?entityType=supplier&entityId=${supplier.id}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((env) => { if (env?.data) setCapabilityDocs(env.data as Upload[]); })
+        .catch(() => {/* silent */});
+    });
   }, [session, sessionLoading, router]);
 
   if (loading) {
@@ -350,30 +349,39 @@ export default function SupplierProfilePage() {
                 Chọn các nhóm hàng mà doanh nghiệp có khả năng cung cấp.{" "}
                 <span className="text-red-500">*</span>
               </p>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {CATEGORIES.map((cat) => {
-                  const checked = form.categories.includes(cat);
-                  return (
-                    <label
-                      key={cat}
-                      className={[
-                        "flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors select-none",
-                        checked
-                          ? "border-[#0f2d5e] bg-[#0f2d5e]/5 text-[#0f2d5e]"
-                          : "border-slate-200 hover:border-slate-300 text-slate-700",
-                      ].join(" ")}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCategory(cat)}
-                        className="w-4 h-4 accent-[#0f2d5e]"
-                      />
-                      <span className="text-sm font-medium">{cat}</span>
-                    </label>
-                  );
-                })}
-              </div>
+              {categories.length === 0 ? (
+                <p className="text-sm text-slate-400 py-2">Đang tải danh mục...</p>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {categories.map((cat) => {
+                    const checked = form.categories.includes(cat.name);
+                    return (
+                      <label
+                        key={cat.id}
+                        className={[
+                          "flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors select-none",
+                          checked
+                            ? "border-[#0f2d5e] bg-[#0f2d5e]/5 text-[#0f2d5e]"
+                            : "border-slate-200 hover:border-slate-300 text-slate-700",
+                        ].join(" ")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCategory(cat.name)}
+                          className="w-4 h-4 accent-[#0f2d5e]"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{cat.name}</p>
+                          {cat.description && (
+                            <p className="text-xs text-slate-400 mt-0.5 leading-snug">{cat.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
               <FieldError msg={errors.categories} />
             </div>
 
