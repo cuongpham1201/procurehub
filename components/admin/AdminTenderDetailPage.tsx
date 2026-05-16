@@ -927,6 +927,28 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                   So sánh báo giá
                 </Link>
               )}
+              {tender.status === "Đã có kết quả" && (
+                <div className="space-y-2">
+                  <Link
+                    href={`/admin/tenders/${tender.id}/report`}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-[#0f2d5e] text-white hover:bg-[#0d2550] transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Xem báo cáo kết quả
+                  </Link>
+                  <a
+                    href={`/api/export/tenders/${tender.id}`}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                    </svg>
+                    Xuất Excel
+                  </a>
+                </div>
+              )}
               {tender.status === "Đang nhận báo giá" && bids.length > 0 && (
                 <div className="space-y-2">
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">

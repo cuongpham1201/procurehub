@@ -133,16 +133,39 @@
 - **AdminBidDetailPage**: section "Tài liệu đính kèm" (read-only `FileList`) load song song với clarifications
 - **AdminSupplierDetailPage**: section "Tài liệu năng lực" (read-only `FileList`) bên cạnh hồ sơ doanh nghiệp
 
+### Phase 5 — Dashboard & Reporting ✅
+
+#### Dashboard real KPIs
+- **`getDashboardStats()`**: single SQL với 13 scalar subqueries — đếm tender/bid/supplier theo trạng thái, tổng giá trị dự kiến + đã chốt, bid mới 30 ngày
+- **`getMonthlyTrends()`**: CTE `generate_series` 6 tháng gần nhất, LEFT JOIN tender/bid counts → `MonthlyTrend[]`
+- **`GET /api/dashboard`**: internal-only, trả `{ stats, trends, activities }`
+- **`AdminDashboard.tsx`** rewrite: xóa toàn bộ localStorage mock; fetch `/api/dashboard`; KPI cards từ PostgreSQL; task cards từ real stats (pendingSuppliers, newBids, closedTenders, pendingApproval)
+- **`TrendChart` SVG**: pure inline SVG (không thêm thư viện), 2 bars/tháng (tenders=#0f2d5e, bids=#c9a227)
+
+#### Procurement report (HTML printable + Excel)
+- **`GET /api/export/tenders/[id]`**: SheetJS XLSX 3 sheets — "Thông tin gói thầu", "Kết quả chọn thầu", "So sánh báo giá"; stream buffer response
+- **`components/admin/TenderReportPage.tsx`**: printable HTML report — header, KPI summary, kết quả theo NCC, danh sách tất cả bids, chữ ký 3 vai trò; `@media print { @page { size: A4 } }`
+- **`app/admin/tenders/[id]/report/page.tsx`**: route cho report page
+- **`AdminTenderDetailPage.tsx`**: sidebar thêm "Xem báo cáo kết quả" + "Xuất Excel" buttons khi status = "Đã có kết quả"
+
+#### Numeric input UX
+- **`components/ui/NumberInput.tsx`**: comma thousand-separator while typing (`\B(?=(\d{3})+(?!\d))`), cursor restoration via `requestAnimationFrame + charsFromEnd`
+- Áp dụng cho: AdminTenderCreatePage (estimatedValue + quantity), AdminTenderDetailPage (estimatedValue + quantity)
+
+#### Pre-submission file upload
+- `SubmitBidPage`: pre-generate `bidId = useState(() => crypto.randomUUID())` → upload trước khi submit
+- `canUpload()` fix: bid chưa tồn tại trong DB → cho phép authenticated supplier (UUID collision negligible)
+- File upload section nằm trong form (trước nút nộp), không sau submit
+
 ---
 
-## Ưu tiên tiếp theo (Phase 5+)
+## Ưu tiên tiếp theo (Phase 6+)
 
 Thứ tự ưu tiên:
 
-1. Dashboard improvements (KPI thực, charts từ PostgreSQL)
-2. Zod validation server-side
-3. Microsoft SSO cho internal users
-4. ERP integration
+1. Zod validation server-side
+2. Microsoft SSO cho internal users
+3. ERP integration
 
 ---
 

@@ -1303,3 +1303,132 @@ export async function getInternalEmailsByRoles(roles: string[]): Promise<string[
   );
   return result.rows.map((r) => r.email).filter(Boolean);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard Statistics (Phase 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DashboardStats {
+  totalTenders: number;
+  openTenders: number;
+  closedTenders: number;
+  awardedTenders: number;
+  pendingApprovalTenders: number;
+  totalTenderValue: number;
+  totalAwardedValue: number;
+  totalSuppliers: number;
+  approvedSuppliers: number;
+  pendingSuppliers: number;
+  totalBids: number;
+  newBids: number;
+  awardedBids: number;
+}
+
+export interface MonthlyTrend {
+  month: string;   // "2025-01"
+  label: string;   // "Th1/25"
+  tenders: number;
+  bids: number;
+  value: number;
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const result = await query<{
+    total_tenders: string;
+    open_tenders: string;
+    closed_tenders: string;
+    awarded_tenders: string;
+    pending_approval_tenders: string;
+    total_tender_value: string;
+    total_awarded_value: string;
+    total_suppliers: string;
+    approved_suppliers: string;
+    pending_suppliers: string;
+    total_bids: string;
+    new_bids: string;
+    awarded_bids: string;
+  }>(`
+    SELECT
+      (SELECT COUNT(*)::text FROM tenders)                                              AS total_tenders,
+      (SELECT COUNT(*)::text FROM tenders WHERE status = 'Đang nhận báo giá')          AS open_tenders,
+      (SELECT COUNT(*)::text FROM tenders WHERE status = 'Đã đóng')                    AS closed_tenders,
+      (SELECT COUNT(*)::text FROM tenders WHERE status = 'Đã có kết quả')              AS awarded_tenders,
+      (SELECT COUNT(*)::text FROM tenders WHERE status = 'Chờ phê duyệt')              AS pending_approval_tenders,
+      (SELECT COALESCE(SUM(estimated_value),0)::text FROM tenders)                     AS total_tender_value,
+      (SELECT COALESCE(SUM(total_amount),0)::text FROM bids WHERE status='Được chọn') AS total_awarded_value,
+      (SELECT COUNT(*)::text FROM suppliers)                                            AS total_suppliers,
+      (SELECT COUNT(*)::text FROM suppliers WHERE status = 'Đã duyệt')                 AS approved_suppliers,
+      (SELECT COUNT(*)::text FROM suppliers WHERE status = 'Chờ xét duyệt')            AS pending_suppliers,
+      (SELECT COUNT(*)::text FROM bids)                                                 AS total_bids,
+      (SELECT COUNT(*)::text FROM bids WHERE status = 'Đã nộp')                        AS new_bids,
+      (SELECT COUNT(*)::text FROM bids WHERE status = 'Được chọn')                     AS awarded_bids
+  `);
+  const row = result.rows[0];
+  return {
+    totalTenders:           Number(row.total_tenders),
+    openTenders:            Number(row.open_tenders),
+    closedTenders:          Number(row.closed_tenders),
+    awardedTenders:         Number(row.awarded_tenders),
+    pendingApprovalTenders: Number(row.pending_approval_tenders),
+    totalTenderValue:       Number(row.total_tender_value),
+    totalAwardedValue:      Number(row.total_awarded_value),
+    totalSuppliers:         Number(row.total_suppliers),
+    approvedSuppliers:      Number(row.approved_suppliers),
+    pendingSuppliers:       Number(row.pending_suppliers),
+    totalBids:              Number(row.total_bids),
+    newBids:                Number(row.new_bids),
+    awardedBids:            Number(row.awarded_bids),
+  };
+}
+
+export async function getMonthlyTrends(): Promise<MonthlyTrend[]> {
+  const result = await query<{
+    month: string;
+    tenders: string;
+    bids: string;
+    value: string;
+  }>(`
+    WITH months AS (
+      SELECT generate_series(
+        date_trunc('month', NOW() - INTERVAL '5 months'),
+        date_trunc('month', NOW()),
+        '1 month'::interval
+      ) AS m
+    ),
+    t_counts AS (
+      SELECT date_trunc('month', created_at) AS m,
+             COUNT(*)::text AS cnt,
+             COALESCE(SUM(estimated_value), 0)::text AS val
+      FROM tenders
+      WHERE created_at >= date_trunc('month', NOW() - INTERVAL '5 months')
+      GROUP BY 1
+    ),
+    b_counts AS (
+      SELECT date_trunc('month', COALESCE(submitted_at, created_at)) AS m,
+             COUNT(*)::text AS cnt
+      FROM bids
+      WHERE COALESCE(submitted_at, created_at) >= date_trunc('month', NOW() - INTERVAL '5 months')
+      GROUP BY 1
+    )
+    SELECT
+      TO_CHAR(months.m, 'YYYY-MM') AS month,
+      COALESCE(t.cnt, '0')         AS tenders,
+      COALESCE(b.cnt, '0')         AS bids,
+      COALESCE(t.val, '0')         AS value
+    FROM months
+    LEFT JOIN t_counts t ON t.m = months.m
+    LEFT JOIN b_counts b ON b.m = months.m
+    ORDER BY months.m ASC
+  `);
+  return result.rows.map((row) => {
+    const [year, mon] = row.month.split("-");
+    const label = `Th${parseInt(mon)}/${String(year).slice(2)}`;
+    return {
+      month:   row.month,
+      label,
+      tenders: Number(row.tenders),
+      bids:    Number(row.bids),
+      value:   Number(row.value),
+    };
+  });
+}
