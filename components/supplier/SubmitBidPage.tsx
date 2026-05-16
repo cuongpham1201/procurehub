@@ -12,6 +12,7 @@ import type { Upload } from "@/types/upload";
 import PublicHeader from "@/components/shared/PublicHeader";
 import { FileUploadZone } from "@/components/ui/FileUploadZone";
 import { FileList } from "@/components/ui/FileList";
+import { NumberInput } from "@/components/ui/NumberInput";
 
 // ── icons ──────────────────────────────────────────────────────────────────
 function IconCheck() {
@@ -241,30 +242,13 @@ function SuccessState({
           </div>
         </div>
 
-        {/* Bid attachments — optional, after submit */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 max-w-lg w-full">
-          <h3 className="text-sm font-semibold text-slate-700 mb-1">
-            Tài liệu đính kèm <span className="text-slate-400 font-normal">(không bắt buộc)</span>
-          </h3>
-          <p className="text-xs text-slate-400 mb-4">
-            Tải lên catalog, chứng chỉ kỹ thuật hoặc tài liệu bổ sung cho báo giá này.
-          </p>
-          <FileUploadZone
-            entityType="bid"
-            entityId={bidId}
-            purpose="bid_attachment"
-            label="Thêm tài liệu đính kèm"
-            onUploaded={(u) => setAttachments((prev) => [u, ...prev])}
-          />
-          <div className="mt-3">
-            <FileList
-              uploads={attachments}
-              canDelete
-              onDeleted={(id) => setAttachments((prev) => prev.filter((u) => u.id !== id))}
-              emptyText=""
-            />
+        {/* Files attached before / during submission */}
+        {attachments.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 max-w-lg w-full">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Tài liệu đã đính kèm</h3>
+            <FileList uploads={attachments} canDelete={false} />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -278,6 +262,9 @@ export default function SubmitBidPage() {
   const isEditMode = editBidId.length > 0;
   const { user: session, loading: sessionLoading } = useCurrentUser();
 
+  // Pre-generate bidId so file uploads can happen before submission
+  const [pendingBidId] = useState(() => crypto.randomUUID());
+
   const [account, setAccount] = useState<SupplierAccount | null>(null);
   const [adminTender, setAdminTender] = useState<AdminTender | null>(null);
   const [editingBid, setEditingBid] = useState<SupplierBid | null>(null);
@@ -286,6 +273,8 @@ export default function SubmitBidPage() {
   const [savedBidCode, setSavedBidCode] = useState<string | null>(null);
   const [savedBidId, setSavedBidId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState("");
+  // Attachments uploaded before / during form fill
+  const [attachments, setAttachments] = useState<Upload[]>([]);
 
   const [header, setHeader] = useState<HeaderForm>({
     deliveryTime: "",
@@ -350,6 +339,14 @@ export default function SubmitBidPage() {
                         note: bi?.note ?? "",
                       };
                     }));
+                    // Load existing uploads for this bid
+                    try {
+                      const uplRes = await fetch(`/api/uploads?entityType=bid&entityId=${encodeURIComponent(editBidId)}`);
+                      if (uplRes.ok) {
+                        const { data: uploads } = await uplRes.json();
+                        if (Array.isArray(uploads)) setAttachments(uploads);
+                      }
+                    } catch { /* non-critical */ }
                   } else {
                     // Bid invalid for edit → show AlreadySubmitted
                     setAlreadySubmitted(true);
@@ -471,6 +468,9 @@ export default function SubmitBidPage() {
     );
   }
 
+  // For edit mode use the existing bid's ID, otherwise use the pre-generated one
+  const uploadEntityId = isEditMode && editingBid ? editingBid.id : pendingBidId;
+
   // ── computed totals ──────────────────────────────────────────────────────
   const amounts = adminTender.items.map((item, i) => {
     const price = parsePrice(itemForms[i]?.unitPrice ?? "");
@@ -573,7 +573,7 @@ export default function SubmitBidPage() {
         const bidCode = codeJson.data as string;
 
         const bid: Omit<SupplierBid, "supplierId"> & { supplierId?: string } = {
-          id: crypto.randomUUID(),
+          id: pendingBidId,
           bidCode,
           tenderId: adminTender.id,
           tenderCode: adminTender.code,
@@ -770,11 +770,9 @@ export default function SubmitBidPage() {
                               {item.unit}
                             </td>
                             <td className="py-3 pr-3 align-top">
-                              <input
-                                type="text"
-                                inputMode="numeric"
+                              <NumberInput
                                 value={f.unitPrice}
-                                onChange={(e) => setItemField(i, "unitPrice", e.target.value)}
+                                onChange={(raw) => setItemField(i, "unitPrice", raw)}
                                 placeholder="0"
                                 className={[
                                   "w-full px-2.5 py-1.5 rounded-lg border text-xs outline-none transition-colors",
@@ -838,6 +836,32 @@ export default function SubmitBidPage() {
                       </tr>
                     </tfoot>
                   </table>
+                </div>
+              )}
+            </div>
+
+            {/* ── File attachments ─────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+              <h2 className="text-sm font-semibold text-slate-700 mb-1">
+                Tài liệu đính kèm{" "}
+                <span className="text-slate-400 font-normal">(không bắt buộc)</span>
+              </h2>
+              <p className="text-xs text-slate-400 mb-4">
+                Tải lên catalog, chứng chỉ chất lượng, CO/CQ hoặc tài liệu bổ sung trước khi nộp báo giá.
+              </p>
+              <FileUploadZone
+                entityType="bid"
+                entityId={uploadEntityId}
+                purpose="bid_attachment"
+                onUploaded={(u) => setAttachments((prev) => [u, ...prev])}
+              />
+              {attachments.length > 0 && (
+                <div className="mt-3">
+                  <FileList
+                    uploads={attachments}
+                    canDelete
+                    onDeleted={(id) => setAttachments((prev) => prev.filter((u) => u.id !== id))}
+                  />
                 </div>
               )}
             </div>

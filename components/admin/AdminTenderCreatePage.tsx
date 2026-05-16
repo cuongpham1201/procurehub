@@ -15,6 +15,7 @@ import {
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { getTodayDateString, isDateTodayOrFuture, toDateInputValue } from "@/services/dateUtils";
 import QuickMaterialModal from "@/components/admin/QuickMaterialModal";
+import { NumberInput } from "@/components/ui/NumberInput";
 import type {
   AdminTender,
   AdminTenderCategory,
@@ -456,10 +457,11 @@ export default function AdminTenderCreatePage() {
           </div>
           <div>
             <Label>Giá trị dự kiến (₫)</Label>
-            <Input
+            <NumberInput
               value={form.estimatedValue}
               onChange={(v) => setField("estimatedValue", v)}
-              placeholder="VD: 2400000000"
+              placeholder="VD: 2.400.000.000"
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2d5e]/20 focus:border-[#0f2d5e]"
             />
           </div>
           <div className="sm:col-span-2">
@@ -607,11 +609,9 @@ export default function AdminTenderCreatePage() {
                     />
                   </td>
                   <td className="px-3 py-2 align-top">
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(e) => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
+                    <NumberInput
+                      value={String(item.quantity)}
+                      onChange={(raw) => updateItem(idx, "quantity", parseInt(raw) || 1)}
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-[#0f2d5e]/30"
                     />
                   </td>

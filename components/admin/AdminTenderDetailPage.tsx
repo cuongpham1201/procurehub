@@ -13,6 +13,7 @@ import {
 } from "@/services/categoryStorage";
 import { formatDisplayDate, getTodayDateString, isDateTodayOrFuture, toDateInputValue } from "@/services/dateUtils";
 import QuickMaterialModal from "@/components/admin/QuickMaterialModal";
+import { NumberInput } from "@/components/ui/NumberInput";
 import type { AdminTender, AdminTenderCategory, AdminTenderStatus } from "@/types/adminTender";
 import type { SupplierBid } from "@/types/supplierBid";
 import type { MaterialItem, PurchaseCategory } from "@/types/category";
@@ -565,7 +566,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                   </div>
                   <div>
                     <label className={labelCls}>Giá trị dự kiến (₫)</label>
-                    <input className={inputCls} type="number" min={0} value={form.estimatedValue} onChange={(e) => setField("estimatedValue", e.target.value)} placeholder="0" />
+                    <NumberInput className={inputCls} value={form.estimatedValue} onChange={(v) => setField("estimatedValue", v)} placeholder="0" />
                     {formErrors.estimatedValue && <p className="text-xs text-red-500 mt-1">{formErrors.estimatedValue}</p>}
                   </div>
                   <div>
@@ -693,7 +694,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                             <input className={inputCls} value={item.specification} onChange={(e) => setItemField(i, "specification", e.target.value)} placeholder="Quy cách" />
                           </td>
                           <td className="px-3 py-2 align-top">
-                            <input className={inputCls} type="number" min={0} value={item.quantity} onChange={(e) => setItemField(i, "quantity", e.target.value)} placeholder="0" />
+                            <NumberInput className={inputCls} value={item.quantity} onChange={(v) => setItemField(i, "quantity", v)} placeholder="0" />
                           </td>
                           <td className="px-3 py-2 align-top">
                             <input className={inputCls} value={item.unit} onChange={(e) => setItemField(i, "unit", e.target.value)} placeholder="Cái, kg..." />
