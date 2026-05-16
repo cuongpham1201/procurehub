@@ -10,7 +10,6 @@ import { getServerSession } from "@/lib/auth/server";
 import {
   createUploadRecord,
   getBid,
-  getSupplier,
   listUploads,
 } from "@/lib/repositories/procurehub";
 import {
@@ -49,6 +48,13 @@ async function canUpload(
 
 export async function POST(request: Request) {
   try {
+    // Fast-reject oversized requests before reading body (Route Handler — next.config
+    // serverActions.bodySizeLimit does NOT apply here, only to Server Actions).
+    const contentLength = parseInt(request.headers.get("content-length") ?? "0", 10);
+    if (contentLength > MAX_FILE_SIZE + 4096) {
+      return fail(new Error("File quá lớn. Tối đa 25 MB."), 413);
+    }
+
     const session = await getServerSession();
     if (!session) return unauthorized();
 

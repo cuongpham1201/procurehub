@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     // Thông báo cho approvers
     await notifyInternalByRolesSafe(APPROVAL_ROLES, {
-      type: NotificationType.TENDER_PUBLISHED, // dùng lại type phù hợp nhất
+      type: NotificationType.AWARD_PROPOSED,
       title: "Đề xuất kết quả cần phê duyệt",
       message: `Gói thầu "${tenderBefore?.title ?? tenderId}" đã có đề xuất kết quả. Vui lòng xem xét và chốt kết quả.`,
       link: `/admin/tenders/${tenderId}/comparison`,

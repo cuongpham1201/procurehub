@@ -14,9 +14,9 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { emailAwardFinalized } from "@/lib/email/service";
 import {
   finalizeAwards,
+  getBidsByTender,
   getTender,
   listAwardItems,
-  listBids,
 } from "@/lib/repositories/procurehub";
 
 export const dynamic = "force-dynamic";
@@ -41,9 +41,8 @@ export async function POST(request: Request) {
 
     await finalizeAwards(tenderId);
 
-    // Fetch updated bids to send notifications
-    const allBids = await listBids();
-    const tenderBids = allBids.filter((b) => b.tenderId === tenderId);
+    // Fetch updated bids to send notifications (only for this tender — avoids full table scan)
+    const tenderBids = await getBidsByTender(tenderId);
     const awardedBidIds = new Set(awards.map((a) => a.bidId));
 
     for (const bid of tenderBids) {

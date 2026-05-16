@@ -16,6 +16,7 @@ export const NotificationType = {
   BID_AWARDED:          "BID_AWARDED",
   BID_REJECTED:         "BID_REJECTED",
   BID_NEED_MORE_INFO:   "BID_NEED_MORE_INFO",
+  AWARD_PROPOSED:       "AWARD_PROPOSED",
   // System
   SYSTEM_ALERT:         "SYSTEM_ALERT",
 } as const;
@@ -67,5 +68,6 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   BID_AWARDED:          { icon: "check", color: "green" },
   BID_REJECTED:         { icon: "x",     color: "red"   },
   BID_NEED_MORE_INFO:   { icon: "alert", color: "amber" },
+  AWARD_PROPOSED:       { icon: "bid",   color: "amber" },
   SYSTEM_ALERT:         { icon: "bell",  color: "amber" },
 };

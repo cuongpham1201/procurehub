@@ -475,6 +475,26 @@ export async function listBids(): Promise<SupplierBid[]> {
   return bids.rows.map((row) => bidFromRow({ ...row, items: itemMap.get(row.id) ?? [] }));
 }
 
+export async function getBidsByTender(tenderId: string): Promise<SupplierBid[]> {
+  const bids = await query<BidRow>(
+    "select * from bids where tender_id = $1 order by submitted_at desc nulls last, created_at desc",
+    [tenderId],
+  );
+  if (bids.rows.length === 0) return [];
+  const bidIds = bids.rows.map((r) => r.id);
+  const items = await query<BidItemRow>(
+    "select * from bid_items where bid_id = ANY($1::text[]) order by sort_order asc, id asc",
+    [bidIds],
+  );
+  const itemMap = new Map<string, BidItemRow[]>();
+  items.rows.forEach((item) => {
+    const list = itemMap.get(item.bid_id) ?? [];
+    list.push(item);
+    itemMap.set(item.bid_id, list);
+  });
+  return bids.rows.map((row) => bidFromRow({ ...row, items: itemMap.get(row.id) ?? [] }));
+}
+
 export async function getBid(id: string): Promise<SupplierBid | null> {
   const bids = await listBids();
   return bids.find((bid) => bid.id === id) ?? null;

@@ -120,11 +120,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         entityType: "tender",
         entityId: previous.id,
         entityName: previous.title,
-        action: "cancelled",
-        description: `Xóa dữ liệu gói thầu ${previous.title}`,
+        action: "deleted",
+        description: `Xóa gói thầu ${previous.title}`,
         metadata: {
           code: previous.code,
-          deleted: true,
         },
         oldValues: snapshot(previous),
         newValues: null,

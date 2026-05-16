@@ -168,22 +168,23 @@ interface ActionBtn { label: string; status: BidStatus; style: string; }
 function getActions(current: BidStatus): ActionBtn[] {
   switch (current) {
     case "Đã nộp":
-      return [{ label: "Bắt đầu xem xét", status: "Đang xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
-    case "Đang xem xét":
       return [
-        { label: "Chuyển sang đánh giá", status: "Đang xem xét", style: "bg-indigo-600 hover:bg-indigo-700 text-white" },
-        { label: "Yêu cầu bổ sung", status: "Cần làm rõ", style: "bg-orange-500 hover:bg-orange-600 text-white" },
-        { label: "Không chọn", status: "Không được chọn", style: "bg-slate-500 hover:bg-slate-600 text-white" },
+        { label: "Bắt đầu xem xét", status: "Đang xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" },
       ];
     case "Đang xem xét":
       return [
-        { label: "Yêu cầu bổ sung", status: "Cần làm rõ", style: "bg-orange-500 hover:bg-orange-600 text-white" },
+        { label: "Yêu cầu làm rõ", status: "Cần làm rõ", style: "bg-orange-500 hover:bg-orange-600 text-white" },
         { label: "Không chọn", status: "Không được chọn", style: "bg-slate-500 hover:bg-slate-600 text-white" },
       ];
     case "Cần làm rõ":
-      return [{ label: "Tiếp tục xem xét", status: "Đang xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" }];
+      return [
+        { label: "Tiếp tục xem xét", status: "Đang xem xét", style: "bg-amber-500 hover:bg-amber-600 text-white" },
+      ];
     case "Đã phản hồi":
-      return [{ label: "Chuyển sang đánh giá", status: "Đang xem xét", style: "bg-indigo-600 hover:bg-indigo-700 text-white" }];
+      return [
+        { label: "Chuyển sang đánh giá", status: "Đang xem xét", style: "bg-indigo-600 hover:bg-indigo-700 text-white" },
+        { label: "Yêu cầu làm rõ thêm", status: "Cần làm rõ", style: "bg-orange-500 hover:bg-orange-600 text-white" },
+      ];
     default:
       return [];
   }
