@@ -679,11 +679,14 @@ export default function AdminUsersPage() {
                 <option value="">Tất cả trạng thái</option>
                 {INT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              {canManage && (
-                <button onClick={() => setUserModal({ mode: "create" })} className="px-4 py-2 text-sm font-medium bg-[#0f2d5e] text-white rounded-lg hover:bg-[#0d2550] transition-colors whitespace-nowrap">
-                  + Tạo tài khoản nội bộ
-                </button>
-              )}
+              <button
+                onClick={() => canManage && setUserModal({ mode: "create" })}
+                disabled={!canManage}
+                title={!canManage ? "Bạn không có quyền quản lý người dùng" : undefined}
+                className="px-4 py-2 text-sm font-medium bg-[#0f2d5e] text-white rounded-lg hover:bg-[#0d2550] transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                + Tạo tài khoản nội bộ
+              </button>
             </div>
           </div>
 

@@ -6,6 +6,7 @@ import { getAdminTenders, ensureTenderSeedData } from "@/services/tenderStorage"
 import { getBids } from "@/services/supplierBidStorage";
 import { ensureCategorySeedData, getPurchaseCategories } from "@/services/categoryStorage";
 import { formatDisplayDate, toDateInputValue } from "@/services/dateUtils";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { AdminTender, AdminTenderStatus, AdminTenderCategory } from "@/types/adminTender";
 import type { PurchaseCategory } from "@/types/category";
 
@@ -83,6 +84,8 @@ const STATUSES: (AdminTenderStatus | "")[] = [
 // ── main component ────────────────────────────────────────────────────────
 
 export default function AdminTendersPage() {
+  const { user: currentUser } = useCurrentUser();
+  const canCreate = (currentUser?.permissions ?? []).includes("tenders:write");
   const [rows, setRows] = useState<TenderRow[]>([]);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<AdminTenderCategory | "">("");
@@ -188,15 +191,27 @@ export default function AdminTendersPage() {
             Tạo, phát hành và theo dõi các gói thầu mua sắm.
           </p>
         </div>
-        <Link
-          href="/admin/tenders/create"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white text-sm font-medium rounded-lg hover:bg-[#0d2550] transition-colors shrink-0"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Tạo gói thầu
-        </Link>
+        {canCreate ? (
+          <Link
+            href="/admin/tenders/create"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white text-sm font-medium rounded-lg hover:bg-[#0d2550] transition-colors shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Tạo gói thầu
+          </Link>
+        ) : (
+          <span
+            title="Bạn không có quyền tạo gói thầu"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0f2d5e] text-white text-sm font-medium rounded-lg shrink-0 opacity-40 cursor-not-allowed select-none"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Tạo gói thầu
+          </span>
+        )}
       </div>
 
       {/* Summary cards */}

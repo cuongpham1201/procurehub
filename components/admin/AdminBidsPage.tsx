@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getBids, deleteBid } from "@/services/supplierBidStorage";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { SupplierBid, BidStatus } from "@/types/supplierBid";
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -105,6 +106,8 @@ type QuickFilter = "all" | "pending" | BidStatus;
 const NEEDS_ACTION_STATUSES: BidStatus[] = ["Cần làm rõ", "Đã phản hồi"];
 
 export default function AdminBidsPage() {
+  const { user: currentUser } = useCurrentUser();
+  const canDelete = (currentUser?.permissions ?? []).includes("bids:evaluate");
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [search, setSearch] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
@@ -355,7 +358,9 @@ export default function AdminBidsPage() {
                           </Link>
                           <button
                             onClick={() => setConfirmDeleteId(bid.id)}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-red-500 border border-red-200 px-2.5 py-1.5 rounded-lg hover:bg-red-500 hover:text-white transition-colors whitespace-nowrap"
+                            disabled={!canDelete}
+                            title={!canDelete ? "Bạn không có quyền xóa báo giá" : undefined}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-red-500 border border-red-200 px-2.5 py-1.5 rounded-lg hover:bg-red-500 hover:text-white transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-red-500"
                           >
                             <IconTrash />
                             Xóa

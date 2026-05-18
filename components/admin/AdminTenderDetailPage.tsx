@@ -870,21 +870,18 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              {canEdit && (
-                <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h3 className="font-semibold text-slate-700 text-sm mb-3">Chỉnh sửa</h3>
-                  <button
-                    onClick={startEdit}
-                    className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] hover:bg-[#0f2d5e] hover:text-white transition-colors"
-                  >
-                    Chỉnh sửa thông tin
-                  </button>
-                </div>
-              )}
-              {!canEdit && (
-                <p className="text-xs text-slate-400 text-center px-2">Bạn chỉ có quyền xem thông tin.</p>
-              )}
-              {canStatus && actions.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-700 text-sm mb-3">Chỉnh sửa</h3>
+                <button
+                  onClick={startEdit}
+                  disabled={!canEdit}
+                  title={!canEdit ? "Bạn không có quyền chỉnh sửa gói thầu" : undefined}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] hover:bg-[#0f2d5e] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#0f2d5e]"
+                >
+                  Chỉnh sửa thông tin
+                </button>
+              </div>
+              {actions.length > 0 && (
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
                   <h3 className="font-semibold text-slate-700 text-sm mb-4">Cập nhật trạng thái</h3>
                   <div className="space-y-2">
@@ -900,7 +897,9 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                       <button
                         key={action.key}
                         onClick={() => handleStatus(action.key)}
-                        className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${action.style}`}
+                        disabled={!canStatus}
+                        title={!canStatus ? "Bạn không có quyền thay đổi trạng thái" : undefined}
+                        className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${action.style}`}
                       >
                         {action.label}
                       </button>

@@ -547,37 +547,32 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              {canEdit && (
-                <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h3 className="font-semibold text-slate-700 text-sm mb-3">Chỉnh sửa</h3>
-                  <button
-                    onClick={startEdit}
-                    className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] hover:bg-[#0f2d5e] hover:text-white transition-colors"
-                  >
-                    Chỉnh sửa thông tin NCC
-                  </button>
-                </div>
-              )}
-              {!canEdit && (
-                <p className="text-xs text-slate-400 text-center px-2">Bạn chỉ có quyền xem thông tin.</p>
-              )}
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-700 text-sm mb-3">Chỉnh sửa</h3>
+                <button
+                  onClick={startEdit}
+                  disabled={!canEdit}
+                  title={!canEdit ? "Bạn không có quyền chỉnh sửa nhà cung cấp" : undefined}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] hover:bg-[#0f2d5e] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#0f2d5e]"
+                >
+                  Chỉnh sửa thông tin NCC
+                </button>
+              </div>
               <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <h3 className="font-semibold text-slate-700 text-sm mb-4">Xét duyệt hồ sơ</h3>
                 <div className="space-y-2">
-                  {ACTIONS.filter(() => canApprove).map((action) => (
+                  {ACTIONS.map((action) => (
                     <button
                       key={action.key}
                       onClick={() => handleAction(action.key)}
-                      disabled={account.status === action.key}
-                      className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${action.style}`}
+                      disabled={!canApprove || account.status === action.key}
+                      title={!canApprove ? "Bạn không có quyền xét duyệt" : undefined}
+                      className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${action.style}`}
                     >
                       {action.label}
                       {account.status === action.key && <span className="ml-2 text-xs opacity-60">(hiện tại)</span>}
                     </button>
                   ))}
-                  {!canApprove && (
-                    <p className="text-xs text-slate-400 text-center py-2">Không có quyền thao tác.</p>
-                  )}
                 </div>
               </div>
             </>
