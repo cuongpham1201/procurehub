@@ -62,6 +62,17 @@ function normalizeText(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function getNextMaterialCode(categoryCode: string, allMaterials: MaterialItem[]): string {
+  const prefix = categoryCode.toUpperCase();
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}-(\\d+)$`);
+  const nums = allMaterials
+    .map((m) => { const match = m.materialCode.match(pattern); return match ? parseInt(match[1], 10) : 0; })
+    .filter((n) => n > 0);
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+  return `${prefix}-${String(next).padStart(3, "0")}`;
+}
+
 function StatusBadge({ status }: { status: CatalogStatus }) {
   const cls =
     status === "Hoạt động"
@@ -247,14 +258,16 @@ export default function AdminCategoriesPage() {
     showSuccess(category.status === "Hoạt động" ? "Đã khóa nhóm mua sắm." : "Đã mở khóa nhóm mua sắm.");
   }
 
-  function openCreateMaterial() {
+  function openCreateMaterial(preselectedCategoryId?: string) {
     if (!isAdmin) return;
+    const defaultCat =
+      (preselectedCategoryId ? categories.find((c) => c.id === preselectedCategoryId) : undefined) ??
+      categories.find((c) => c.status === "Hoạt động") ??
+      categories[0];
+    const autoCode = defaultCat ? getNextMaterialCode(defaultCat.code, materials) : "";
     setMaterialMode("create");
     setMaterialEditingId("");
-    setMaterialForm({
-      ...EMPTY_MATERIAL_FORM,
-      categoryId: categories.find((item) => item.status === "Hoạt động")?.id ?? categories[0]?.id ?? "",
-    });
+    setMaterialForm({ ...EMPTY_MATERIAL_FORM, categoryId: defaultCat?.id ?? "", materialCode: autoCode });
     setFormError("");
     setTab("materials");
   }
@@ -290,15 +303,7 @@ export default function AdminCategoriesPage() {
     const materialName = materialForm.materialName.trim();
     const unit = materialForm.unit.trim();
     if (!category || !materialCode || !materialName || !unit) {
-      setFormError("Vui lòng nhập đủ nhóm mua sắm, mã vật tư, tên vật tư và đơn vị.");
-      return;
-    }
-
-    const duplicate = materials.some(
-      (item) => item.id !== materialEditingId && item.materialCode.toUpperCase() === materialCode,
-    );
-    if (duplicate) {
-      setFormError("Mã vật tư đã tồn tại.");
+      setFormError("Vui lòng nhập đủ nhóm mua sắm, tên vật tư và đơn vị.");
       return;
     }
 
@@ -352,7 +357,7 @@ export default function AdminCategoriesPage() {
             </button>
             <button
               type="button"
-              onClick={openCreateMaterial}
+              onClick={() => openCreateMaterial()}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#0f2d5e] text-[#0f2d5e] text-sm font-medium rounded-lg hover:bg-[#0f2d5e]/5 transition-colors"
             >
               <span>+</span>
@@ -561,7 +566,11 @@ export default function AdminCategoriesPage() {
                   <select
                     className={inputCls}
                     value={materialForm.categoryId}
-                    onChange={(e) => setMaterialForm((prev) => ({ ...prev, categoryId: e.target.value }))}
+                    onChange={(e) => {
+                      const cat = categories.find((c) => c.id === e.target.value);
+                      const autoCode = cat && materialMode === "create" ? getNextMaterialCode(cat.code, materials) : materialForm.materialCode;
+                      setMaterialForm((prev) => ({ ...prev, categoryId: e.target.value, materialCode: autoCode }));
+                    }}
                   >
                     <option value="">Chọn nhóm mua sắm</option>
                     {categories.map((category) => (
@@ -572,12 +581,15 @@ export default function AdminCategoriesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Mã vật tư *</label>
+                  <label className={labelCls}>
+                    Mã vật tư
+                    {materialMode === "create" && <span className="ml-1 text-[10px] text-slate-400 font-normal">(tự động)</span>}
+                  </label>
                   <input
-                    className={inputCls}
+                    className={`${inputCls} bg-slate-50 text-slate-500 cursor-default`}
                     value={materialForm.materialCode}
-                    onChange={(e) => setMaterialForm((prev) => ({ ...prev, materialCode: e.target.value.toUpperCase() }))}
-                    placeholder="VD: NVL-THEP-Q195"
+                    readOnly
+                    tabIndex={-1}
                   />
                 </div>
                 <div>
