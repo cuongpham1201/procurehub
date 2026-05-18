@@ -4,7 +4,10 @@
       "Bash(Get-ChildItem -Path \"D:\\\\AI-code\\\\web\\\\procurehub\" -Directory)",
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(awk '{print $NF}')",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
