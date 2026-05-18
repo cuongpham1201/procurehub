@@ -1,4 +1,4 @@
-import { fail, ok, unauthorized } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
   actorFromSession,
   describeActivity,
@@ -8,6 +8,7 @@ import {
   withActorFallback,
 } from "@/lib/activity-log";
 import { getServerSession } from "@/lib/auth/server";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { getInternalUser, listInternalUsers, upsertInternalUser } from "@/lib/repositories/procurehub";
 import type { InternalUser } from "@/types/internalUser";
 import type { ActivityAction } from "@/types/activityLog";
@@ -25,6 +26,8 @@ export async function GET() {
   try {
     const session = await getServerSession();
     if (!session || session.kind !== "internal") return unauthorized();
+    if (!(await hasPermissionDB(session.role, "users:manage")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xem người dùng nội bộ`);
     return ok(await listInternalUsers());
   } catch (error) {
     return fail(error);
@@ -35,6 +38,8 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession();
     if (!session || session.kind !== "internal") return unauthorized();
+    if (!(await hasPermissionDB(session.role, "users:manage")))
+      return forbidden(`Vai trò "${session.role}" không có quyền quản lý người dùng nội bộ`);
     const user = (await request.json()) as InternalUser;
     const previous = user.id ? await getInternalUser(user.id) : null;
     const saved = await upsertInternalUser(user);

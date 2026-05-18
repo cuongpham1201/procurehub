@@ -1,7 +1,7 @@
 // KHVT đề xuất kết quả — tender chuyển sang "Chờ phê duyệt",
 // bids có award items → "Đề xuất chọn".
 // Trưởng phòng / Admin sẽ finalize sau qua /api/award-items/finalize.
-import { fail, ok, unauthorized } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
   actorFromSession,
   describeActivity,
@@ -11,6 +11,7 @@ import {
   withActorFallback,
 } from "@/lib/activity-log";
 import { getServerSession } from "@/lib/auth/server";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import { emailAwardProposed } from "@/lib/email/service";
@@ -29,6 +30,8 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession();
     if (!session || session.kind !== "internal") return unauthorized();
+    if (!(await hasPermissionDB(session.role, "bids:evaluate")))
+      return forbidden(`Vai trò "${session.role}" không có quyền đề xuất kết quả chọn thầu`);
 
     const { tenderId } = (await request.json()) as { tenderId: string };
     if (!tenderId) return fail(new Error("tenderId required"), 400);

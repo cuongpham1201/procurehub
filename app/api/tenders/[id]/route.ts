@@ -1,4 +1,4 @@
-import { fail, ok, unauthorized } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
   actorFromSession,
   describeActivity,
@@ -8,6 +8,7 @@ import {
   withActorFallback,
 } from "@/lib/activity-log";
 import { getServerSession } from "@/lib/auth/server";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import { emailTenderPublishedInternal } from "@/lib/email/service";
@@ -51,6 +52,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const tender = (await request.json()) as AdminTender;
     const previous = await getTender(id);
+
+    // Phân biệt: đổi trạng thái → tenders:publish, sửa nội dung → tenders:write
+    const isStatusChange = previous && tender.status !== previous.status;
+    if (isStatusChange) {
+      if (!(await hasPermissionDB(session.role, "tenders:publish")))
+        return forbidden(`Vai trò "${session.role}" không có quyền thay đổi trạng thái gói thầu`);
+    } else {
+      if (!(await hasPermissionDB(session.role, "tenders:write")))
+        return forbidden(`Vai trò "${session.role}" không có quyền chỉnh sửa gói thầu`);
+    }
     const saved = await upsertTender({ ...tender, id });
     const action = resolveTenderAction(previous, saved);
     await logActivitySafe({
@@ -111,6 +122,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const session = await getServerSession();
     if (!session || session.kind !== "internal") return unauthorized();
+    if (!(await hasPermissionDB(session.role, "tenders:delete")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xóa gói thầu`);
     const { id } = await params;
     const previous = await getTender(id);
     await deleteTenderRecord(id);
