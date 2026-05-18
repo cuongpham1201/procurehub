@@ -181,6 +181,7 @@ function SuccessState({ tender }: { tender: AdminTender }) {
 export default function AdminTenderCreatePage() {
   const { user: currentUser } = useCurrentUser();
   const role = currentUser?.role ?? "Chỉ xem";
+  const permissions = currentUser?.permissions ?? [];
   const [form, setForm] = useState<FormState>({
     title: "",
     category: "",
@@ -579,7 +580,7 @@ export default function AdminTenderCreatePage() {
                       {errors[`item_material_${idx}`] && (
                         <p className="text-[11px] text-red-500 mt-1">{errors[`item_material_${idx}`]}</p>
                       )}
-                      {role === "Admin" && (
+                      {permissions.includes("admin:full") && (
                         <button
                           type="button"
                           onClick={() => openQuickMaterial(idx)}
@@ -664,7 +665,7 @@ export default function AdminTenderCreatePage() {
         </div>
       </div>
 
-      {role === "Admin" && quickMaterialRow !== null && selectedCategory && (
+      {permissions.includes("admin:full") && quickMaterialRow !== null && selectedCategory && (
         <QuickMaterialModal
           category={selectedCategory}
           materials={materialItems}

@@ -8,6 +8,7 @@ import {
   withActorFallback,
 } from "@/lib/activity-log";
 import { getServerSession } from "@/lib/auth/server";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import { getBid, getSupplier, getTender, listBids, upsertBid } from "@/lib/repositories/procurehub";
@@ -37,6 +38,10 @@ export async function GET(request: Request) {
     const supplierId = url.searchParams.get("supplierId") ?? undefined;
 
     let bids = await listBids();
+
+    // Internal phải có bids:read
+    if (session.kind === "internal" && !(await hasPermissionDB(session.role, "bids:read")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xem báo giá`);
 
     // Security: suppliers may only see their own bids — never other suppliers' data
     if (session.kind === "supplier") {

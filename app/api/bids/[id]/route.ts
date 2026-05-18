@@ -1,4 +1,4 @@
-import { fail, ok, unauthorized } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
   actorFromSession,
   describeActivity,
@@ -8,6 +8,7 @@ import {
   withActorFallback,
 } from "@/lib/activity-log";
 import { getServerSession } from "@/lib/auth/server";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import {
   createNotificationDedupedSafe,
   notifyInternalByRolesSafe,
@@ -39,6 +40,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const bid = await getBid(id);
     // Supplier may only read their own bid
     if (session.kind === "supplier" && bid?.supplierId !== session.sub) return unauthorized();
+    // Internal phải có bids:read
+    if (session.kind === "internal" && !(await hasPermissionDB(session.role, "bids:read")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xem báo giá`);
     return ok(bid);
   } catch (error) {
     return fail(error);

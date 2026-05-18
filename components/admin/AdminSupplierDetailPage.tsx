@@ -14,15 +14,7 @@ import { FileList } from "@/components/ui/FileList";
 
 // ── permissions ───────────────────────────────────────────────────────────
 
-function canEditSupplier(role: string) {
-  return role === "Admin" || role === "Trưởng phòng vật tư";
-}
-
-function canSupplierAction(role: string, key: string): boolean {
-  if (role === "Admin" || role === "Trưởng phòng vật tư") return true;
-  if (role === "Kế hoạch vật tư") return key === "Yêu cầu bổ sung";
-  return false;
-}
+// permissions-based checks — xem lib/auth/rbac.ts
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -138,6 +130,7 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1";
 export default function AdminSupplierDetailPage({ id }: { id: string }) {
   const { user: currentUser } = useCurrentUser();
   const role = currentUser?.role ?? "Chỉ xem";
+  const permissions = currentUser?.permissions ?? [];
   const [account, setAccount] = useState<SupplierAccount | null | undefined>(undefined);
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [capabilityUploads, setCapabilityUploads] = useState<Upload[]>([]);
@@ -289,7 +282,8 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
     );
   }
 
-  const canEdit = canEditSupplier(role);
+  const canEdit = permissions.includes("suppliers:write");
+  const canApprove = permissions.includes("suppliers:approve");
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -570,7 +564,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
               <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <h3 className="font-semibold text-slate-700 text-sm mb-4">Xét duyệt hồ sơ</h3>
                 <div className="space-y-2">
-                  {ACTIONS.filter((a) => canSupplierAction(role, a.key)).map((action) => (
+                  {ACTIONS.filter(() => canApprove).map((action) => (
                     <button
                       key={action.key}
                       onClick={() => handleAction(action.key)}
@@ -581,7 +575,7 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
                       {account.status === action.key && <span className="ml-2 text-xs opacity-60">(hiện tại)</span>}
                     </button>
                   ))}
-                  {ACTIONS.filter((a) => canSupplierAction(role, a.key)).length === 0 && (
+                  {!canApprove && (
                     <p className="text-xs text-slate-400 text-center py-2">Không có quyền thao tác.</p>
                   )}
                 </div>

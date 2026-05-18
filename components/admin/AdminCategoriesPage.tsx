@@ -97,7 +97,7 @@ export default function AdminCategoriesPage() {
   const [tab, setTab] = useState<Tab>("categories");
   const [categories, setCategories] = useState<PurchaseCategory[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
-  const role = currentUser?.role ?? "Chỉ xem";
+  const role = currentUser?.role ?? "Chỉ xem"; // giữ cho các chỗ dùng role display
   const [categorySearch, setCategorySearch] = useState("");
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialCategoryFilter, setMaterialCategoryFilter] = useState("");
@@ -110,7 +110,7 @@ export default function AdminCategoriesPage() {
   const [formError, setFormError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const isAdmin = role === "Admin";
+  const isAdmin = (currentUser?.permissions ?? []).includes("admin:full");
 
   async function reloadData() {
     const [nextCategories, nextMaterials] = await Promise.all([getPurchaseCategories(), getMaterialItems()]);

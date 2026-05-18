@@ -39,7 +39,20 @@ function resolveTenderAction(previous: AdminTender | null, current: AdminTender)
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    return ok(await getTender(id));
+    const session = await getServerSession();
+    const tender = await getTender(id);
+
+    // Non-internal (supplier/guest): only published tenders
+    if (!session || session.kind !== "internal") {
+      if (!tender || tender.status === "Nháp" || tender.status === "Đã hủy") return unauthorized();
+      return ok(tender);
+    }
+
+    // Internal: must have tenders:read
+    if (!(await hasPermissionDB(session.role, "tenders:read")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xem gói thầu`);
+
+    return ok(tender);
   } catch (error) {
     return fail(error);
   }

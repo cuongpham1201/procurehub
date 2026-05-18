@@ -1,4 +1,4 @@
-import { fail, ok, unauthorized } from "@/lib/api";
+import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
   actorFromSession,
   describeActivity,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/activity-log";
 import { hashPassword } from "@/lib/auth/password";
 import { getServerSession } from "@/lib/auth/server";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import {
@@ -40,7 +41,8 @@ export async function GET() {
     if (!session) return unauthorized();
 
     if (session.kind === "internal") {
-      // Admin/internal can see all suppliers
+      if (!(await hasPermissionDB(session.role, "suppliers:read")))
+        return forbidden(`Vai trò "${session.role}" không có quyền xem nhà cung cấp`);
       return ok(await listSuppliers());
     }
 

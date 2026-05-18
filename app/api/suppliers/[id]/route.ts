@@ -40,6 +40,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     // Supplier chỉ xem được record của chính mình
     if (session.kind === "supplier" && session.sub !== id) return forbidden();
+    // Internal phải có suppliers:read
+    if (session.kind === "internal" && !(await hasPermissionDB(session.role, "suppliers:read")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xem nhà cung cấp`);
     return ok(await getSupplier(id));
   } catch (error) {
     return fail(error);

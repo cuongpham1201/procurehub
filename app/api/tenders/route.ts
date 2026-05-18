@@ -35,10 +35,14 @@ export async function GET() {
     const session = await getServerSession();
     const tenders = await listTenders();
 
-    // Non-internal users (supplier, guest) only see published/visible tenders
+    // Non-internal: chỉ thấy tenders đang mở
     if (!session || session.kind !== "internal") {
       return ok(tenders.filter((t) => t.status !== "Nháp" && t.status !== "Đã hủy" && t.status !== "Chờ phê duyệt"));
     }
+
+    // Internal: phải có tenders:read để thấy full list (bao gồm Nháp)
+    if (!(await hasPermissionDB(session.role, "tenders:read")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xem gói thầu`);
 
     return ok(tenders);
   } catch (error) {

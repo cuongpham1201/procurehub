@@ -21,9 +21,7 @@ import type { SupplierAccount } from "@/types/supplierAccount";
 
 // ── permissions ───────────────────────────────────────────────────────────
 
-function canManageUsers(role: string) {
-  return role === "Admin";
-}
+// permissions-based check
 
 // ── shared helpers ────────────────────────────────────────────────────────
 
@@ -490,7 +488,7 @@ type NccModal =
 export default function AdminUsersPage() {
   const { user: currentUser } = useCurrentUser();
   const [activeTab, setActiveTab] = useState<ActiveTab>("internal");
-  const canManage = canManageUsers(currentUser?.role ?? "Chỉ xem");
+  const canManage = (currentUser?.permissions ?? []).includes("users:manage");
   const [successMsg, setSuccessMsg] = useState("");
 
   // ── Internal tab state ─────────────────────────────────────────────────

@@ -18,15 +18,6 @@ import type { AdminTender, AdminTenderCategory, AdminTenderStatus } from "@/type
 import type { SupplierBid } from "@/types/supplierBid";
 import type { MaterialItem, PurchaseCategory } from "@/types/category";
 
-// ── permissions ───────────────────────────────────────────────────────────
-
-function canEditTender(role: string) {
-  return role === "Admin" || role === "Trưởng phòng vật tư";
-}
-function canChangeStatus(role: string) {
-  return ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"].includes(role);
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
@@ -161,6 +152,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
   const [bids, setBids] = useState<SupplierBid[]>([]);
   const [successMsg, setSuccessMsg] = useState("");
   const role = currentUser?.role ?? "Chỉ xem";
+  const permissions = currentUser?.permissions ?? [];
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<EditForm | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -210,7 +202,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
   }
 
   async function handleReopenTender() {
-    if (!tender || role !== "Admin" || tender.status !== "Đã đóng") return;
+    if (!tender || !permissions.includes("admin:full") || tender.status !== "Đã đóng") return;
     const normalizedDeadline = toDateInputValue(reopenDeadline);
     if (!normalizedDeadline) {
       setReopenError("Ngày không hợp lệ.");
@@ -475,9 +467,9 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
   }
 
   const actions = getActions(tender.status);
-  const canEdit = canEditTender(role);
-  const canStatus = canChangeStatus(role);
-  const isAdmin = role === "Admin";
+  const canEdit = permissions.includes("tenders:write");
+  const canStatus = permissions.includes("tenders:publish");
+  const isAdmin = permissions.includes("admin:full");
   const canReopenTender = isAdmin && tender.status === "Đã đóng";
   const categoryOptions =
     form && form.category && !purchaseCategories.some((category) => category.name === form.category || category.code === form.category)
