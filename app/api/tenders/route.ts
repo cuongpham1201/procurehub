@@ -11,7 +11,8 @@ import { getServerSession } from "@/lib/auth/server";
 import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
-import { listTenders, upsertTender } from "@/lib/repositories/procurehub";
+import { getActiveSupplierEmails, listTenders, upsertTender } from "@/lib/repositories/procurehub";
+import { emailTenderPublishedSuppliers } from "@/lib/email/service";
 import type { AdminTender } from "@/types/adminTender";
 import type { ActivityAction } from "@/types/activityLog";
 
@@ -104,6 +105,14 @@ export async function POST(request: Request) {
         link: `/admin/tenders/${saved.id}`,
         metadata: { tenderId: saved.id, tenderCode: saved.code, tenderTitle: saved.title },
       });
+      const supplierEmails = await getActiveSupplierEmails().catch(() => []);
+      void emailTenderPublishedSuppliers(
+        supplierEmails,
+        saved.title,
+        saved.code ?? "",
+        saved.deadline ?? "",
+        `/tenders/${saved.id}`,
+      );
     }
     return ok(saved);
   } catch (error) {

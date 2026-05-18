@@ -14,6 +14,12 @@ import {
 } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
 import { getSupplier, upsertSupplier } from "@/lib/repositories/procurehub";
+import {
+  emailSupplierApproved,
+  emailSupplierDeactivated,
+  emailSupplierNeedMoreInfo,
+  emailSupplierRejected,
+} from "@/lib/email/service";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { ActivityAction } from "@/types/activityLog";
 import { getServerSession } from "@/lib/auth/server";
@@ -112,6 +118,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           message: "Hồ sơ nhà cung cấp của bạn đã được xét duyệt thành công. Bạn có thể tham gia đấu thầu ngay.",
           link: "/supplier/dashboard",
         });
+        void emailSupplierApproved(saved.email, saved.companyName);
       } else if (saved.status === "Từ chối") {
         await markReadByTypesSafe(saved.id, "supplier", [
           NotificationType.SUPPLIER_APPROVED,
@@ -124,6 +131,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           message: "Hồ sơ nhà cung cấp của bạn chưa được phê duyệt. Vui lòng liên hệ phòng mua sắm để biết thêm chi tiết.",
           link: "/supplier/profile",
         });
+        void emailSupplierRejected(saved.email, saved.companyName);
       } else if (saved.status === "Tạm khóa") {
         await markReadByTypesSafe(saved.id, "supplier", [
           NotificationType.SUPPLIER_APPROVED,
@@ -136,6 +144,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           message: "Tài khoản nhà cung cấp của bạn đang bị tạm khóa. Vui lòng liên hệ bộ phận phụ trách.",
           link: "/supplier/dashboard",
         });
+        void emailSupplierDeactivated(saved.email, saved.companyName);
       } else if (saved.status === "Yêu cầu bổ sung") {
         await markReadByTypesSafe(saved.id, "supplier", [
           NotificationType.SUPPLIER_APPROVED,
@@ -147,6 +156,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           message: "Phòng mua sắm yêu cầu bổ sung thông tin trước khi phê duyệt. Vui lòng cập nhật hồ sơ nhà cung cấp.",
           link: "/supplier/profile",
         });
+        void emailSupplierNeedMoreInfo(saved.email, saved.companyName);
       }
     }
 

@@ -1304,6 +1304,13 @@ export async function getInternalEmailsByRoles(roles: string[]): Promise<string[
   return result.rows.map((r) => r.email).filter(Boolean);
 }
 
+export async function getActiveSupplierEmails(): Promise<string[]> {
+  const result = await query<{ email: string }>(
+    `SELECT email FROM suppliers WHERE status = 'Đã duyệt' AND email IS NOT NULL AND email <> ''`,
+  );
+  return result.rows.map((r) => r.email).filter(Boolean);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Statistics (Phase 5)
 // ─────────────────────────────────────────────────────────────────────────────

@@ -11,9 +11,15 @@ import { emailEnabled, smtpConfig } from "./config";
 import {
   awardFinalizedSupplierEmail,
   awardProposedEmail,
+  bidSubmittedEmail,
   clarificationRequestedEmail,
   clarificationRespondedEmail,
+  supplierApprovedEmail,
+  supplierDeactivatedEmail,
+  supplierNeedMoreInfoEmail,
+  supplierRejectedEmail,
   tenderPublishedInternalEmail,
+  tenderPublishedSuppliersEmail,
 } from "./templates";
 
 // ── Core ──────────────────────────────────────────────────────────────────────
@@ -116,6 +122,60 @@ export async function emailAwardFinalized(
     supplierName, bidCode, tenderTitle, selected,
   );
   await sendEmailSafe(supplierEmail, subject, html);
+}
+
+/** Supplier: account approved */
+export async function emailSupplierApproved(email: string | undefined, name: string): Promise<void> {
+  if (!email) return;
+  const { subject, html } = supplierApprovedEmail(name);
+  await sendEmailSafe(email, subject, html);
+}
+
+/** Supplier: account rejected */
+export async function emailSupplierRejected(email: string | undefined, name: string): Promise<void> {
+  if (!email) return;
+  const { subject, html } = supplierRejectedEmail(name);
+  await sendEmailSafe(email, subject, html);
+}
+
+/** Supplier: needs to submit more info */
+export async function emailSupplierNeedMoreInfo(email: string | undefined, name: string): Promise<void> {
+  if (!email) return;
+  const { subject, html } = supplierNeedMoreInfoEmail(name);
+  await sendEmailSafe(email, subject, html);
+}
+
+/** Supplier: account deactivated */
+export async function emailSupplierDeactivated(email: string | undefined, name: string): Promise<void> {
+  if (!email) return;
+  const { subject, html } = supplierDeactivatedEmail(name);
+  await sendEmailSafe(email, subject, html);
+}
+
+/** All active suppliers: a tender has been published, inviting bids */
+export async function emailTenderPublishedSuppliers(
+  supplierEmails: string[],
+  tenderTitle: string,
+  tenderCode: string,
+  deadline: string,
+  tenderLink: string,
+): Promise<void> {
+  if (!supplierEmails.length) return;
+  const { subject, html } = tenderPublishedSuppliersEmail(tenderTitle, tenderCode, deadline, tenderLink);
+  await sendEmailSafe(supplierEmails, subject, html);
+}
+
+/** Internal: a supplier has submitted a new bid */
+export async function emailBidSubmitted(
+  internalEmails: string[],
+  supplierName: string,
+  bidCode: string,
+  tenderTitle: string,
+  adminLink: string,
+): Promise<void> {
+  if (!internalEmails.length) return;
+  const { subject, html } = bidSubmittedEmail(supplierName, bidCode, tenderTitle, adminLink);
+  await sendEmailSafe(internalEmails, subject, html);
 }
 
 /** Internal: a tender has been published and is open for bids */

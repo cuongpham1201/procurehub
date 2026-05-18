@@ -3,13 +3,16 @@
  *
  * SMTP configuration from environment variables.
  *
- * .env / .env.local:
- *   SMTP_HOST=smtp.gmail.com
+ * Microsoft 365 (biahalong.com tenant):
+ *   SMTP_HOST=smtp.office365.com
  *   SMTP_PORT=587
- *   SMTP_SECURE=false
- *   SMTP_USER=procurement@biahalong.com
- *   SMTP_PASS=your-app-password
- *   SMTP_FROM="Bia Hạ Long Procurement <procurement@biahalong.com>"
+ *   SMTP_SECURE=false          # STARTTLS on port 587
+ *   SMTP_USER=admin@biahalong.com
+ *   SMTP_PASS=your-m365-password
+ *   SMTP_FROM="Bia Hạ Long Procurement <admin@biahalong.com>"
+ *
+ * Prerequisite: enable SMTP AUTH for the mailbox in M365 Admin Center
+ *   → Users → Active users → select mailbox → Mail → Manage email apps → SMTP ✓
  */
 
 export interface SmtpConfig {

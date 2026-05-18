@@ -11,7 +11,8 @@ import { getServerSession } from "@/lib/auth/server";
 import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
-import { getBid, getSupplier, getTender, listBids, upsertBid } from "@/lib/repositories/procurehub";
+import { getBid, getInternalEmailsByRoles, getSupplier, getTender, listBids, upsertBid } from "@/lib/repositories/procurehub";
+import { emailBidSubmitted } from "@/lib/email/service";
 import type { SupplierBid } from "@/types/supplierBid";
 import type { ActivityAction } from "@/types/activityLog";
 
@@ -143,6 +144,14 @@ export async function POST(request: Request) {
         link: `/admin/bids/${saved.id}`,
         metadata: { bidId: saved.id, bidCode: saved.bidCode, supplierId: saved.supplierId, tenderCode: saved.tenderCode },
       });
+      const internalEmails = await getInternalEmailsByRoles(PROCUREMENT_ROLES).catch(() => []);
+      void emailBidSubmitted(
+        internalEmails,
+        saved.supplierName,
+        saved.bidCode,
+        saved.tenderTitle ?? saved.tenderCode ?? "",
+        `/admin/bids/${saved.id}`,
+      );
     }
     return ok(saved);
   } catch (error) {

@@ -153,6 +153,88 @@ export function awardFinalizedSupplierEmail(
   }
 }
 
+// ── Supplier status changed → supplier ───────────────────────────────────────
+
+export function supplierApprovedEmail(supplierName: string): ReturnType<typeof wrap> {
+  const subject = `[Chúc mừng] Hồ sơ nhà cung cấp đã được phê duyệt`;
+  const body = `
+    <p>Kính gửi ${highlight(supplierName)},</p>
+    <p>Chúng tôi vui mừng thông báo hồ sơ đăng ký nhà cung cấp của quý công ty đã được <strong style="color:#16a34a;">phê duyệt thành công</strong>.</p>
+    <p>Quý công ty có thể đăng nhập vào hệ thống để xem các gói thầu đang mở và tham gia báo giá.</p>
+    ${btn("Xem gói thầu đang mở", `${APP_URL}/tenders`)}
+  `;
+  return wrap(subject, body);
+}
+
+export function supplierRejectedEmail(supplierName: string): ReturnType<typeof wrap> {
+  const subject = `[Thông báo] Hồ sơ nhà cung cấp chưa được phê duyệt`;
+  const body = `
+    <p>Kính gửi ${highlight(supplierName)},</p>
+    <p>Sau khi xem xét, hồ sơ đăng ký nhà cung cấp của quý công ty <strong style="color:#dc2626;">chưa được phê duyệt</strong>.</p>
+    <p>Vui lòng liên hệ bộ phận mua sắm qua email <a href="mailto:admin@biahalong.com" style="color:${BRAND_COLOR};">admin@biahalong.com</a> để được hỗ trợ thêm thông tin.</p>
+  `;
+  return wrap(subject, body);
+}
+
+export function supplierNeedMoreInfoEmail(supplierName: string): ReturnType<typeof wrap> {
+  const subject = `[Yêu cầu bổ sung] Hồ sơ nhà cung cấp cần cập nhật`;
+  const body = `
+    <p>Kính gửi ${highlight(supplierName)},</p>
+    <p>Phòng mua sắm yêu cầu quý công ty <strong>bổ sung thêm thông tin</strong> trước khi có thể phê duyệt hồ sơ.</p>
+    <p>Vui lòng đăng nhập vào hệ thống, cập nhật hồ sơ và gửi lại để xét duyệt.</p>
+    ${btn("Cập nhật hồ sơ", `${APP_URL}/supplier/profile`)}
+  `;
+  return wrap(subject, body);
+}
+
+export function supplierDeactivatedEmail(supplierName: string): ReturnType<typeof wrap> {
+  const subject = `[Thông báo] Tài khoản nhà cung cấp bị tạm khóa`;
+  const body = `
+    <p>Kính gửi ${highlight(supplierName)},</p>
+    <p>Tài khoản nhà cung cấp của quý công ty hiện đang bị <strong style="color:#dc2626;">tạm khóa</strong>.</p>
+    <p>Vui lòng liên hệ bộ phận mua sắm qua email <a href="mailto:admin@biahalong.com" style="color:${BRAND_COLOR};">admin@biahalong.com</a> để được hỗ trợ.</p>
+  `;
+  return wrap(subject, body);
+}
+
+// ── Tender published → all active suppliers ────────────────────────────────────
+
+export function tenderPublishedSuppliersEmail(
+  tenderTitle: string,
+  tenderCode: string,
+  deadline: string,
+  tenderLink: string,
+): ReturnType<typeof wrap> {
+  const subject = `[Gói thầu mới] ${tenderCode} — Mời báo giá`;
+  const body = `
+    <p>Kính gửi Quý nhà cung cấp,</p>
+    <p>Bia Hạ Long trân trọng mời quý công ty tham gia báo giá cho gói thầu:</p>
+    <p style="margin:0 0 8px;font-size:16px;"><strong>${tenderTitle}</strong></p>
+    <p style="margin:0 0 16px;color:#64748b;">${tenderCode} · Hạn nộp: <strong>${deadline}</strong></p>
+    <p>Vui lòng đăng nhập vào hệ thống để xem chi tiết yêu cầu và nộp báo giá trước hạn.</p>
+    ${btn("Xem gói thầu và báo giá", `${APP_URL}${tenderLink}`)}
+  `;
+  return wrap(subject, body);
+}
+
+// ── Bid submitted → internal ───────────────────────────────────────────────────
+
+export function bidSubmittedEmail(
+  supplierName: string,
+  bidCode: string,
+  tenderTitle: string,
+  adminLink: string,
+): ReturnType<typeof wrap> {
+  const subject = `[Báo giá mới] ${bidCode} — ${supplierName}`;
+  const body = `
+    <p>${highlight(supplierName)} vừa nộp báo giá ${highlight(bidCode)} cho gói thầu:</p>
+    <p style="margin:0 0 16px;"><strong>${tenderTitle}</strong></p>
+    <p>Vui lòng đăng nhập vào hệ thống để xem và đánh giá báo giá.</p>
+    ${btn("Xem báo giá", `${APP_URL}${adminLink}`)}
+  `;
+  return wrap(subject, body);
+}
+
 // ── Tender published → internal ───────────────────────────────────────────────
 
 export function tenderPublishedInternalEmail(
