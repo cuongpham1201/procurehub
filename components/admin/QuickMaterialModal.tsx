@@ -5,19 +5,10 @@ import { createMaterialItem } from "@/services/categoryStorage";
 import type { MaterialItem, PurchaseCategory } from "@/types/category";
 
 type QuickMaterialForm = {
-  materialCode: string;
   materialName: string;
   specification: string;
   unit: string;
   description: string;
-};
-
-const EMPTY_FORM: QuickMaterialForm = {
-  materialCode: "",
-  materialName: "",
-  specification: "",
-  unit: "Cái",
-  description: "",
 };
 
 const UNITS = ["Cái", "Bộ", "Kg", "Tấn", "Mét", "M²", "M³", "Lít", "Thùng", "Cuộn", "Hộp", "Gói"];
@@ -26,8 +17,15 @@ const inputCls =
   "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2d5e]/20 focus:border-[#0f2d5e] bg-white";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1";
 
-function sameCode(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
+function getNextMaterialCode(categoryCode: string, allMaterials: MaterialItem[]): string {
+  const prefix = categoryCode.toUpperCase();
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}-(\\d+)$`);
+  const nums = allMaterials
+    .map((m) => { const match = m.materialCode.match(pattern); return match ? parseInt(match[1], 10) : 0; })
+    .filter((n) => n > 0);
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+  return `${prefix}-${String(next).padStart(3, "0")}`;
 }
 
 export default function QuickMaterialModal({
@@ -41,42 +39,28 @@ export default function QuickMaterialModal({
   onClose: () => void;
   onCreated: (material: MaterialItem) => void;
 }) {
-  const [form, setForm] = useState<QuickMaterialForm>(EMPTY_FORM);
-  const [errors, setErrors] = useState<Partial<Record<keyof QuickMaterialForm | "duplicate", string>>>({});
+  const autoCode = getNextMaterialCode(category.code, materials);
+  const [form, setForm] = useState<QuickMaterialForm>({ materialName: "", specification: "", unit: "Cái", description: "" });
+  const [errors, setErrors] = useState<Partial<Record<keyof QuickMaterialForm, string>>>({});
 
   function setField(key: keyof QuickMaterialForm, value: string) {
-    setForm((prev) => ({ ...prev, [key]: key === "materialCode" ? value.toUpperCase() : value }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      delete next.duplicate;
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
   }
 
   async function submit() {
-    const nextErrors: Partial<Record<keyof QuickMaterialForm | "duplicate", string>> = {};
-    const materialCode = form.materialCode.trim();
+    const nextErrors: Partial<Record<keyof QuickMaterialForm, string>> = {};
     const materialName = form.materialName.trim();
     const unit = form.unit.trim();
-
-    if (!materialCode) nextErrors.materialCode = "Vui lòng nhập mã vật tư.";
     if (!materialName) nextErrors.materialName = "Vui lòng nhập tên vật tư.";
     if (!unit) nextErrors.unit = "Vui lòng nhập đơn vị.";
-    if (materialCode && materials.some((item) => sameCode(item.materialCode, materialCode))) {
-      nextErrors.duplicate = "Mã vật tư đã tồn tại trong danh mục.";
-    }
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
-      return;
-    }
+    if (Object.keys(nextErrors).length > 0) { setErrors(nextErrors); return; }
 
     const material = await createMaterialItem(
       {
         categoryId: category.id,
         categoryName: category.name,
-        materialCode,
+        materialCode: autoCode,
         materialName,
         specification: form.specification,
         unit,
@@ -113,14 +97,15 @@ export default function QuickMaterialModal({
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Mã vật tư <span className="text-red-500">*</span></label>
+              <label className={labelCls}>
+                Mã vật tư <span className="ml-1 text-[10px] text-slate-400 font-normal">(tự động)</span>
+              </label>
               <input
-                className={inputCls}
-                value={form.materialCode}
-                onChange={(e) => setField("materialCode", e.target.value)}
-                placeholder="VD: NVL-THEP-Q345"
+                className={`${inputCls} bg-slate-50 text-slate-500 cursor-default`}
+                value={autoCode}
+                readOnly
+                tabIndex={-1}
               />
-              {errors.materialCode && <p className="text-xs text-red-500 mt-1">{errors.materialCode}</p>}
             </div>
             <div>
               <label className={labelCls}>Đơn vị <span className="text-red-500">*</span></label>
@@ -166,7 +151,6 @@ export default function QuickMaterialModal({
               placeholder="Ghi chú thêm cho danh mục vật tư"
             />
           </div>
-          {errors.duplicate && <p className="text-xs text-red-500">{errors.duplicate}</p>}
           <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-1">
             <button
               type="button"
