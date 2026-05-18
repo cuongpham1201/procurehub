@@ -686,14 +686,18 @@ export default function AdminTenderCreatePage() {
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="px-6 py-2.5 text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] rounded-lg hover:bg-[#0f2d5e]/5 transition-colors"
+            disabled={!permissions.includes("tenders:write")}
+            title={!permissions.includes("tenders:write") ? "Bạn không có quyền tạo gói thầu" : undefined}
+            className="px-6 py-2.5 text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] rounded-lg hover:bg-[#0f2d5e]/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Lưu nháp
           </button>
           <button
             type="button"
             onClick={handlePublish}
-            className="px-6 py-2.5 text-sm font-semibold bg-[#0f2d5e] text-white rounded-lg hover:bg-[#0d2550] transition-colors"
+            disabled={!permissions.includes("tenders:write")}
+            title={!permissions.includes("tenders:write") ? "Bạn không có quyền tạo gói thầu" : undefined}
+            className="px-6 py-2.5 text-sm font-semibold bg-[#0f2d5e] text-white rounded-lg hover:bg-[#0d2550] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Phát hành gói thầu
           </button>
