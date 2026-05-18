@@ -15,7 +15,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ShieldCheck,
 } from "lucide-react";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface AdminSidebarProps {
   open: boolean;
@@ -24,7 +26,14 @@ interface AdminSidebarProps {
   onToggleCollapse: () => void;
 }
 
-const NAV_GROUPS = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  adminOnly?: boolean;
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Menu",
     items: [
@@ -42,9 +51,10 @@ const NAV_GROUPS = [
   {
     label: "Hệ thống",
     items: [
-      { label: "Người dùng",    href: "/admin/users",           icon: Users },
-      { label: "Nhóm mua sắm", href: "/admin/categories",      icon: Package },
-      { label: "Activity Log",  href: "/admin/activity-logs",   icon: Clock },
+      { label: "Người dùng",    href: "/admin/users",              icon: Users },
+      { label: "Nhóm mua sắm",  href: "/admin/categories",         icon: Package },
+      { label: "Activity Log",  href: "/admin/activity-logs",      icon: Clock },
+      { label: "Phân quyền",    href: "/admin/role-permissions",   icon: ShieldCheck, adminOnly: true },
     ],
   },
 ];
@@ -61,6 +71,8 @@ export default function AdminSidebar({
   onToggleCollapse,
 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const { user } = useCurrentUser();
+  const isAdmin = user?.role === "Admin";
 
   return (
     <aside
@@ -132,6 +144,7 @@ export default function AdminSidebar({
 
             <ul className="space-y-0.5">
               {group.items.map((item) => {
+                if (item.adminOnly && !isAdmin) return null;
                 const active = isActive(item.href, pathname);
                 const Icon = item.icon;
                 return (

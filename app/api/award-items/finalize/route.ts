@@ -10,7 +10,7 @@ import {
 import { getServerSession } from "@/lib/auth/server";
 import { createNotificationDedupedSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
-import { hasPermission } from "@/lib/auth/rbac";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { emailAwardFinalized } from "@/lib/email/service";
 import {
   finalizeAwards,
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const session = await getServerSession();
     if (!session || session.kind !== "internal") return unauthorized();
     // Chỉ Trưởng phòng vật tư / Admin mới được chốt kết quả
-    if (!hasPermission(session.role, "bids:evaluate"))
+    if (!(await hasPermissionDB(session.role, "bids:evaluate")))
       return forbidden(`Vai trò "${session.role}" không có quyền chốt kết quả. Chỉ Trưởng phòng vật tư hoặc Admin mới được thực hiện thao tác này.`);
     const { tenderId } = (await request.json()) as { tenderId: string };
     if (!tenderId) return fail(new Error("tenderId required"), 400);

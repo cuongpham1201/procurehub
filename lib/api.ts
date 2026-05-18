@@ -14,3 +14,7 @@ export function unauthorized(message = "Unauthorized") {
 export function forbidden(message = "Forbidden") {
   return Response.json({ data: null, error: message }, { status: 403 });
 }
+
+export function badRequest(message = "Bad Request") {
+  return Response.json({ data: null, error: message }, { status: 400 });
+}

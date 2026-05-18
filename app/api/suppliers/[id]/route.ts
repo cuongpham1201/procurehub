@@ -17,7 +17,7 @@ import { getSupplier, upsertSupplier } from "@/lib/repositories/procurehub";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { ActivityAction } from "@/types/activityLog";
 import { getServerSession } from "@/lib/auth/server";
-import { hasPermission } from "@/lib/auth/rbac";
+import { hasPermissionDB } from "@/lib/auth/rbac-server";
 
 const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
@@ -65,9 +65,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     } else {
       // Internal user — kiểm tra permission
       const isStatusChange = previous && supplier.status !== previous.status;
-      if (isStatusChange && !hasPermission(session.role, "suppliers:approve"))
+      if (isStatusChange && !(await hasPermissionDB(session.role, "suppliers:approve")))
         return forbidden(`Vai trò "${session.role}" không có quyền thay đổi trạng thái nhà cung cấp`);
-      if (!isStatusChange && !hasPermission(session.role, "suppliers:write"))
+      if (!isStatusChange && !(await hasPermissionDB(session.role, "suppliers:write")))
         return forbidden(`Vai trò "${session.role}" không có quyền chỉnh sửa nhà cung cấp`);
     }
     // ─────────────────────────────────────────────────────────────────────────

@@ -1432,3 +1432,32 @@ export async function getMonthlyTrends(): Promise<MonthlyTrend[]> {
     };
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Role Permissions (Phase 6 — dynamic RBAC)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getAllRolePermissions(): Promise<Record<string, string[]>> {
+  const result = await query<{ role: string; permission: string }>(
+    `SELECT role, permission FROM role_permissions ORDER BY role, permission`,
+    [],
+  );
+  const map: Record<string, string[]> = {};
+  for (const row of result.rows) {
+    if (!map[row.role]) map[row.role] = [];
+    map[row.role].push(row.permission);
+  }
+  return map;
+}
+
+export async function setRolePermissions(role: string, permissions: string[]): Promise<void> {
+  await withTransaction(async (txQuery) => {
+    await txQuery(`DELETE FROM role_permissions WHERE role = $1`, [role]);
+    for (const permission of permissions) {
+      await txQuery(
+        `INSERT INTO role_permissions (role, permission) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [role, permission],
+      );
+    }
+  });
+}

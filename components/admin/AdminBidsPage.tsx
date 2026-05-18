@@ -134,7 +134,7 @@ export default function AdminBidsPage() {
   const total = bids.length;
   const countNew = bids.filter((b) => b.status === "Đã nộp").length;
   const countReview = bids.filter((b) => b.status === "Đang xem xét").length;
-  const countEval = bids.filter((b) => b.status === "Đang xem xét").length;
+  const countEval = bids.filter((b) => b.status === "Đề xuất chọn").length;
   const countChosen = bids.filter((b) => b.status === "Được chọn").length;
   const countPending = bids.filter((b) => (NEEDS_ACTION_STATUSES as string[]).includes(b.status)).length;
 
@@ -178,7 +178,7 @@ export default function AdminBidsPage() {
         <SummaryCard label="Tổng báo giá" value={total} accent="border-slate-200" />
         <SummaryCard label="Báo giá mới" value={countNew} accent="border-blue-100" />
         <SummaryCard label="Đang xem xét" value={countReview} accent="border-amber-100" />
-        <SummaryCard label="Đang đánh giá" value={countEval} accent="border-indigo-100" />
+        <SummaryCard label="Đề xuất chọn" value={countEval} accent="border-indigo-100" />
         <SummaryCard label="Được chọn" value={countChosen} accent="border-emerald-100" />
       </div>
 
@@ -217,9 +217,9 @@ export default function AdminBidsPage() {
           { key: "all",     label: "Tất cả",      count: total },
           { key: "pending", label: "Cần xử lý",   count: countPending, accent: true },
           { key: "Đã nộp",  label: "Mới nộp",     count: countNew },
-          { key: "Đang xem xét", label: "Đang xem xét", count: countReview },
-          { key: "Đang xem xét", label: "Đang xem xét", count: countEval },
-          { key: "Được chọn",    label: "Được chọn",     count: countChosen },
+          { key: "Đang xem xét",  label: "Đang xem xét",  count: countReview },
+          { key: "Đề xuất chọn", label: "Đề xuất chọn",  count: countEval },
+          { key: "Được chọn",    label: "Được chọn",      count: countChosen },
         ] as { key: QuickFilter; label: string; count: number; accent?: boolean }[]).map(({ key, label, count, accent }) => (
           <button
             key={key}
