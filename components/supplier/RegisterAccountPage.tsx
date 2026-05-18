@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   saveAccount,
   isEmailExists,
@@ -97,7 +98,7 @@ function SuccessState({ supplierId }: { supplierId: string }) {
           Tạo tài khoản thành công!
         </h2>
         <p className="text-sm text-slate-500 mb-4">
-          Tài khoản nhà cung cấp đã được tạo ở chế độ demo.
+          Tài khoản nhà cung cấp đã được tạo. Vui lòng đăng nhập để hoàn thiện hồ sơ.
         </p>
         <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left space-y-1">
           <p className="text-xs text-slate-400 uppercase tracking-wide font-medium">Mã tài khoản</p>
@@ -106,7 +107,7 @@ function SuccessState({ supplierId }: { supplierId: string }) {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <Link
-            href="/supplier/profile"
+            href="/login?next=%2Fsupplier%2Fprofile"
             className="flex-1 bg-[#c9a227] hover:bg-[#b8960c] text-white font-semibold py-2.5 px-4 rounded-lg text-sm text-center transition-colors"
           >
             Hoàn thiện hồ sơ
@@ -125,6 +126,7 @@ function SuccessState({ supplierId }: { supplierId: string }) {
 
 // ── main component ─────────────────────────────────────────────────────────
 export default function RegisterAccountPage() {
+  const router = useRouter();
   const [form, setForm] = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<FormErrors>({});
   const [globalError, setGlobalError] = useState("");
@@ -195,6 +197,26 @@ export default function RegisterAccountPage() {
       createdAt: new Date().toISOString(),
     };
     await saveAccount(account);
+
+    // Auto-login after registration so the supplier lands directly on profile
+    try {
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          kind: "supplier",
+        }),
+      });
+      if (loginRes.ok) {
+        router.push("/supplier/profile");
+        return;
+      }
+    } catch {
+      // fall through to success state
+    }
+
     setSavedId(id);
   }
 
