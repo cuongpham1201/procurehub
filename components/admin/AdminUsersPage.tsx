@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   getAdminUsers,
   saveAdminUser,
+  deleteAdminUser,
   generateUserId,
   MOCK_ADMIN,
   INTERNAL_DEFAULT_PASSWORD,
@@ -14,6 +15,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   getAccounts,
   updateAccount,
+  deleteSupplierAccount,
   normalizePhone,
 } from "@/services/supplierAccountStorage";
 import type { InternalUser } from "@/types/internalUser";
@@ -488,7 +490,9 @@ type NccModal =
 export default function AdminUsersPage() {
   const { user: currentUser } = useCurrentUser();
   const [activeTab, setActiveTab] = useState<ActiveTab>("internal");
-  const canManage = (currentUser?.permissions ?? []).includes("users:manage");
+  const permissions = currentUser?.permissions ?? [];
+  const canManage = permissions.includes("users:manage");
+  const canDeleteSupplier = permissions.includes("suppliers:delete");
   const [successMsg, setSuccessMsg] = useState("");
 
   // ── Internal tab state ─────────────────────────────────────────────────
@@ -551,6 +555,17 @@ export default function AdminUsersPage() {
     showSuccess(updated.status === "Tạm khóa" ? `Đã khóa tài khoản ${u.fullName}.` : `Đã mở khóa ${u.fullName}.`);
   }
 
+  async function handleIntDelete(u: InternalUser) {
+    if (!window.confirm(`Xóa vĩnh viễn tài khoản "${u.fullName}" (${u.email})? Hành động này không thể hoàn tác.`)) return;
+    try {
+      await deleteAdminUser(u.id);
+      await loadInternalUsers();
+      showSuccess(`Đã xóa tài khoản ${u.fullName}.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Xóa thất bại. Vui lòng thử lại.");
+    }
+  }
+
   async function handleUserModalSaved() {
     setUserModal(null);
     await loadInternalUsers();
@@ -589,6 +604,17 @@ export default function AdminUsersPage() {
     await updateAccount(updated);
     await loadSuppliers();
     showSuccess(updated.status === "Tạm khóa" ? `Đã khóa tài khoản ${a.companyName}.` : `Đã mở khóa ${a.companyName}.`);
+  }
+
+  async function handleNccDelete(a: SupplierAccount) {
+    if (!window.confirm(`Xóa vĩnh viễn tài khoản nhà cung cấp "${a.companyName}"?\n\nTất cả dữ liệu liên quan (hồ sơ, báo giá) sẽ bị xóa và không thể khôi phục.`)) return;
+    try {
+      await deleteSupplierAccount(a.id);
+      await loadSuppliers();
+      showSuccess(`Đã xóa tài khoản nhà cung cấp ${a.companyName}.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Xóa thất bại. Vui lòng thử lại.");
+    }
   }
 
   async function handleNccEditSaved() {
@@ -748,6 +774,14 @@ export default function AdminUsersPage() {
                                     {u.status === "Hoạt động" ? "Khóa" : "Mở khóa"}
                                   </button>
                                 )}
+                                {!builtin && !isCurrent && (
+                                  <button
+                                    onClick={() => handleIntDelete(u)}
+                                    className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors"
+                                  >
+                                    Xóa
+                                  </button>
+                                )}
                               </div>
                             </td>
                           )}
@@ -843,6 +877,14 @@ export default function AdminUsersPage() {
                               >
                                 {a.status === "Tạm khóa" ? "Mở khóa" : "Khóa"}
                               </button>
+                              {canDeleteSupplier && (
+                                <button
+                                  onClick={() => handleNccDelete(a)}
+                                  className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors"
+                                >
+                                  Xóa
+                                </button>
+                              )}
                             </div>
                           </td>
                         )}

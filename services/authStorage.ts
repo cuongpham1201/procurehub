@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "@/services/apiClient";
+import { apiDelete, apiGet, apiPost } from "@/services/apiClient";
 import type { InternalUser } from "@/types/internalUser";
 
 export const INTERNAL_DEFAULT_PASSWORD = "123456";
@@ -24,6 +24,10 @@ export async function getAdminUsers(): Promise<InternalUser[]> {
 
 export async function saveAdminUser(user: InternalUser): Promise<void> {
   await apiPost<InternalUser>("/api/internal-users", user);
+}
+
+export async function deleteAdminUser(id: string): Promise<void> {
+  await apiDelete<boolean>(`/api/internal-users/${encodeURIComponent(id)}`);
 }
 
 export function generateUserId(): string {

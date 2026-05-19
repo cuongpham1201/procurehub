@@ -513,6 +513,14 @@ export async function deleteTenderRecord(id: string): Promise<void> {
   await query("delete from tenders where id = $1 or code = $1", [id]);
 }
 
+export async function deleteSupplierRecord(id: string): Promise<void> {
+  await query("DELETE FROM suppliers WHERE id = $1", [id]);
+}
+
+export async function deleteInternalUserRecord(id: string): Promise<void> {
+  await query("DELETE FROM internal_users WHERE id = $1", [id]);
+}
+
 export async function listBids(): Promise<SupplierBid[]> {
   const bids = await query<BidRow>("select * from bids order by submitted_at desc nulls last, created_at desc");
   const items = await query<BidItemRow>("select * from bid_items order by bid_id asc, sort_order asc, id asc");

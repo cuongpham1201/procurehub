@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getAccounts, updateAccount } from "@/services/supplierAccountStorage";
+import { useRouter } from "next/navigation";
+import { getAccounts, updateAccount, deleteSupplierAccount } from "@/services/supplierAccountStorage";
 import { normalizePhone } from "@/services/supplierAccountStorage";
 import { getBids } from "@/services/supplierBidStorage";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -128,6 +129,7 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1";
 // ── main component ────────────────────────────────────────────────────────
 
 export default function AdminSupplierDetailPage({ id }: { id: string }) {
+  const router = useRouter();
   const { user: currentUser } = useCurrentUser();
   const role = currentUser?.role ?? "Chỉ xem";
   const permissions = currentUser?.permissions ?? [];
@@ -284,6 +286,18 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
 
   const canEdit = permissions.includes("suppliers:write");
   const canApprove = permissions.includes("suppliers:approve");
+  const canDelete = permissions.includes("suppliers:delete");
+
+  async function handleDelete() {
+    if (!account) return;
+    if (!window.confirm(`Xóa vĩnh viễn tài khoản nhà cung cấp "${account.companyName}"?\n\nTất cả dữ liệu liên quan sẽ bị xóa và không thể khôi phục.`)) return;
+    try {
+      await deleteSupplierAccount(account.id);
+      router.push("/admin/suppliers");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Xóa thất bại. Vui lòng thử lại.");
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -587,6 +601,19 @@ export default function AdminSupplierDetailPage({ id }: { id: string }) {
             </svg>
             Quay lại danh sách
           </Link>
+
+          {canDelete && (
+            <div className="bg-white rounded-xl border border-red-100 p-5">
+              <h3 className="font-semibold text-red-700 text-sm mb-2">Vùng nguy hiểm</h3>
+              <p className="text-xs text-slate-500 mb-3">Xóa vĩnh viễn tài khoản nhà cung cấp này. Hành động không thể hoàn tác.</p>
+              <button
+                onClick={handleDelete}
+                className="w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Xóa tài khoản NCC
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

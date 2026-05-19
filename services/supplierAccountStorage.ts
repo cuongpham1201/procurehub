@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "@/services/apiClient";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/services/apiClient";
 import type { SupplierAccount } from "@/types/supplierAccount";
 
 export async function getAccounts(): Promise<SupplierAccount[]> {
@@ -19,6 +19,10 @@ export async function saveAccount(account: SupplierAccount): Promise<void> {
 
 export async function updateAccount(updated: SupplierAccount): Promise<void> {
   await apiPut<SupplierAccount>(`/api/suppliers/${encodeURIComponent(updated.id)}`, updated);
+}
+
+export async function deleteSupplierAccount(id: string): Promise<void> {
+  await apiDelete<boolean>(`/api/suppliers/${encodeURIComponent(id)}`);
 }
 
 async function checkDuplicates(params: {

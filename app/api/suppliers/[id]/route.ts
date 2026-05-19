@@ -13,7 +13,7 @@ import {
   notifyInternalByRolesDedupedSafe,
 } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
-import { getSupplier, upsertSupplier } from "@/lib/repositories/procurehub";
+import { deleteSupplierRecord, getSupplier, upsertSupplier } from "@/lib/repositories/procurehub";
 import {
   emailSupplierApproved,
   emailSupplierDeactivated,
@@ -172,6 +172,33 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     return ok(saved);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession();
+    if (!session || session.kind !== "internal") return unauthorized();
+    if (!(await hasPermissionDB(session.role, "suppliers:delete")))
+      return forbidden(`Vai trò "${session.role}" không có quyền xóa tài khoản nhà cung cấp`);
+    const { id } = await params;
+    const previous = await getSupplier(id);
+    if (!previous) return fail(new Error("Không tìm thấy nhà cung cấp"), 404);
+    await deleteSupplierRecord(id);
+    await logActivitySafe({
+      ...withActorFallback(getActorFromRequest(request), actorFromSession(session)),
+      entityType: "supplier",
+      entityId: previous.id,
+      entityName: previous.companyName,
+      action: "deleted",
+      description: `Xóa tài khoản nhà cung cấp ${previous.companyName}`,
+      metadata: { taxCode: previous.taxCode, email: previous.email },
+      oldValues: snapshot(previous),
+      newValues: null,
+    });
+    return ok(true);
   } catch (error) {
     return fail(error);
   }

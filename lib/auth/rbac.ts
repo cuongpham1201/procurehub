@@ -15,6 +15,7 @@ export type Permission =
   | "suppliers:read"
   | "suppliers:write"
   | "suppliers:approve"
+  | "suppliers:delete"
   | "bids:read"
   | "bids:evaluate"
   | "users:manage"
@@ -37,6 +38,7 @@ export const PERMISSION_META: Record<Permission, PermissionMeta> = {
   "suppliers:read":   { group: "Nhà cung cấp", label: "Xem nhà cung cấp",          description: "Xem danh sách và hồ sơ nhà cung cấp" },
   "suppliers:write":  { group: "Nhà cung cấp", label: "Sửa hồ sơ NCC",             description: "Chỉnh sửa thông tin hồ sơ nhà cung cấp" },
   "suppliers:approve":{ group: "Nhà cung cấp", label: "Duyệt / Từ chối NCC",       description: "Phê duyệt, từ chối hoặc yêu cầu bổ sung hồ sơ" },
+  "suppliers:delete": { group: "Nhà cung cấp", label: "Xóa tài khoản NCC",         description: "Xóa vĩnh viễn tài khoản nhà cung cấp" },
   "bids:read":        { group: "Báo giá",       label: "Xem báo giá",               description: "Xem danh sách và chi tiết báo giá" },
   "bids:evaluate":    { group: "Báo giá",       label: "Đánh giá & chốt thầu",      description: "So sánh, đề xuất và chốt kết quả chọn thầu" },
   "users:manage":     { group: "Hệ thống",      label: "Quản lý người dùng nội bộ", description: "Tạo, sửa, khóa tài khoản và phân vai trò" },
@@ -46,7 +48,7 @@ export const PERMISSION_META: Record<Permission, PermissionMeta> = {
 
 export const ALL_PERMISSIONS: Permission[] = [
   "tenders:read", "tenders:write", "tenders:publish", "tenders:delete",
-  "suppliers:read", "suppliers:write", "suppliers:approve",
+  "suppliers:read", "suppliers:write", "suppliers:approve", "suppliers:delete",
   "bids:read", "bids:evaluate",
   "users:manage", "reports:read", "admin:full",
 ];
@@ -68,7 +70,7 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, Permission[]> = {
   Admin: [
     "admin:full",
     "tenders:read", "tenders:write", "tenders:publish", "tenders:delete",
-    "suppliers:read", "suppliers:write", "suppliers:approve",
+    "suppliers:read", "suppliers:write", "suppliers:approve", "suppliers:delete",
     "bids:read", "bids:evaluate",
     "users:manage",
     "reports:read",
