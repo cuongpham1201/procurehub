@@ -17,6 +17,7 @@ import {
   supplierActivationEmail,
   supplierApprovedEmail,
   supplierDeactivatedEmail,
+  supplierForgotPasswordEmail,
   supplierNeedMoreInfoEmail,
   supplierRejectedEmail,
   tenderPublishedInternalEmail,
@@ -63,6 +64,17 @@ export async function sendEmailSafe(
 }
 
 // ── Typed helpers ─────────────────────────────────────────────────────────────
+
+/** Supplier: forgot-password email with new temp password */
+export async function emailSupplierForgotPassword(
+  email: string,
+  supplierName: string,
+  tempPassword: string,
+  loginUrl: string,
+): Promise<void> {
+  const { subject, html } = supplierForgotPasswordEmail(supplierName, tempPassword, loginUrl);
+  await sendEmailSafe(email, subject, html);
+}
 
 /** Supplier: activation email with temp password and verification link */
 export async function emailSupplierActivation(

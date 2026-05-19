@@ -124,6 +124,14 @@ export default function LoginPage() {
 
             <div className="mt-6 pt-6 border-t border-slate-100 text-center space-y-2">
               <p className="text-sm text-slate-500">
+                <Link
+                  href="/supplier/forgot-password"
+                  className="text-[#0f2d5e] font-medium hover:underline"
+                >
+                  Quên mật khẩu?
+                </Link>
+              </p>
+              <p className="text-sm text-slate-500">
                 Chưa có tài khoản?{" "}
                 <Link
                   href="/supplier/register-account"

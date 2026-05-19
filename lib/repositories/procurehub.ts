@@ -405,6 +405,26 @@ export async function markPasswordChanged(id: string, newPasswordHash: string): 
   );
 }
 
+/**
+ * Find supplier by email, reset their password, and set must_change_password.
+ * Returns { id, company_name } if found, null if no supplier with that email.
+ */
+export async function resetSupplierPasswordByEmail(
+  email: string,
+  newPasswordHash: string,
+): Promise<{ id: string; companyName: string } | null> {
+  const res = await query<{ id: string; company_name: string }>(
+    `UPDATE suppliers
+     SET password_hash = $1, password = '', must_change_password = TRUE, updated_at = NOW()
+     WHERE lower(trim(email)) = lower(trim($2))
+     RETURNING id, company_name`,
+    [newPasswordHash, email],
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return { id: row.id, companyName: row.company_name };
+}
+
 /** Returns email_verified + must_change_password for a supplier by id */
 export async function getSupplierAuthFlags(
   id: string,

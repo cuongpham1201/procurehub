@@ -12,8 +12,8 @@ export async function PUT(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.kind !== "supplier") {
-    return NextResponse.json({ error: "Chỉ nhà cung cấp mới được đổi mật khẩu qua API này" }, { status: 403 });
+  if (session.kind !== "supplier" && session.kind !== "internal") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let body: { currentPassword?: string; newPassword?: string };
@@ -35,9 +35,11 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Mật khẩu mới phải khác mật khẩu hiện tại" }, { status: 400 });
   }
 
+  const table = session.kind === "supplier" ? "suppliers" : "internal_users";
+
   // Fetch current hash
   const res = await query<{ password: string | null; password_hash: string | null }>(
-    "SELECT password, password_hash FROM suppliers WHERE id = $1",
+    `SELECT password, password_hash FROM ${table} WHERE id = $1`,
     [session.sub],
   );
   const row = res.rows[0];
@@ -57,7 +59,15 @@ export async function PUT(req: NextRequest) {
   }
 
   const newHash = await hashPassword(newPassword);
-  await markPasswordChanged(session.sub, newHash);
+
+  if (session.kind === "supplier") {
+    await markPasswordChanged(session.sub, newHash);
+  } else {
+    await query(
+      "UPDATE internal_users SET password_hash = $1, password = NULL WHERE id = $2",
+      [newHash, session.sub],
+    );
+  }
 
   // Suppress unused-var — cookies() must be called to finalize the response in Next.js App Router
   void (await cookies());

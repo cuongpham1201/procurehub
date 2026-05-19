@@ -267,7 +267,7 @@ function buildCategories(tenders: AdminTender[], categories: PurchaseCategory[])
 
 function buildLatestOpenTenders(tenders: AdminTender[]): Tender[] {
   return [...tenders]
-    .filter((t) => t.status === "Đang nhận báo giá" || t.status === "Đã đóng")
+    .filter((t) => t.status && t.status !== "Nháp")
     .sort((a, b) => {
       const deadlineDiff = parseDateTime(a.deadline) - parseDateTime(b.deadline);
       if (deadlineDiff !== 0) return deadlineDiff;

@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser, logout } from "@/hooks/useCurrentUser";
 import NotificationBell from "@/components/notifications/NotificationBell";
-import { Menu, ChevronRight, LogOut, User, Home } from "lucide-react";
+import { Menu, ChevronRight, LogOut, User, Home, KeyRound } from "lucide-react";
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -210,6 +210,14 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
                 >
                   <Home className="w-4 h-4 text-slate-400" />
                   Về trang chủ
+                </Link>
+                <Link
+                  href="/admin/change-password"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <KeyRound className="w-4 h-4 text-slate-400" />
+                  Đổi mật khẩu
                 </Link>
                 <button
                   onClick={handleLogout}

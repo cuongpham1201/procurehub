@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import NotificationBell from "@/components/notifications/NotificationBell";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { getAccounts } from "@/services/supplierAccountStorage";
 import { useCurrentUser, logout } from "@/hooks/useCurrentUser";
 import { getBidsBySupplier } from "@/services/supplierBidStorage";
@@ -22,6 +22,9 @@ import {
   Clock,
   AlertTriangle,
   Building2,
+  Home,
+  KeyRound,
+  ChevronDown,
 } from "lucide-react";
 
 // ── icons ──────────────────────────────────────────────────────────────────
@@ -393,6 +396,19 @@ export default function SupplierDashboardPage() {
     router.push("/");
   }
 
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const isApproved = normalizeStatus(account) === "Đã duyệt";
 
   function getStatusBadge(status: string) {
@@ -436,13 +452,48 @@ export default function SupplierDashboardPage() {
               <span className="truncate max-w-[200px]">{account.companyName}</span>
             </div>
             <NotificationBell variant="supplier" />
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-sm text-white/65 hover:text-white border border-white/20 hover:border-white/40 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" strokeWidth={1.8} />
-              Đăng xuất
-            </button>
+            <div ref={userMenuRef} className="relative">
+              <button
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-sm text-white/65 hover:text-white border border-white/20 hover:border-white/40 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <span className="hidden sm:inline truncate max-w-[120px]">{account.companyName}</span>
+                <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.8} />
+              </button>
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-50">
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <div className="text-[13px] font-semibold text-slate-800 truncate">{account.companyName}</div>
+                    <div className="text-xs text-[var(--brand-accent)] font-medium mt-0.5">Nhà cung cấp</div>
+                  </div>
+                  <div className="py-1">
+                    <Link
+                      href="/"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Home className="w-4 h-4 text-slate-400" strokeWidth={1.8} />
+                      Về trang chủ
+                    </Link>
+                    <Link
+                      href="/supplier/change-password"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <KeyRound className="w-4 h-4 text-slate-400" strokeWidth={1.8} />
+                      Đổi mật khẩu
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" strokeWidth={1.8} />
+                      Đăng xuất
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

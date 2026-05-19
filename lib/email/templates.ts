@@ -83,6 +83,25 @@ export function supplierActivationEmail(
   return wrap(subject, body);
 }
 
+// ── Supplier forgot password ──────────────────────────────────────────────────
+
+export function supplierForgotPasswordEmail(
+  supplierName: string,
+  tempPassword: string,
+  loginUrl: string,
+): ReturnType<typeof wrap> {
+  const subject = `[Đặt lại mật khẩu] Nhà cung cấp ${APP_NAME}`;
+  const body = `
+    <p>Kính gửi ${highlight(supplierName)},</p>
+    <p>Chúng tôi đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản nhà cung cấp của quý công ty trên hệ thống <strong>${APP_NAME}</strong>.</p>
+    <p>Mật khẩu mới tạm thời của quý vị là:</p>
+    ${noteBox(`Mật khẩu tạm thời: ${tempPassword}\n\nLưu ý: Quý vị sẽ được yêu cầu đổi mật khẩu ngay sau khi đăng nhập.`, "#f0fdf4", "#16a34a")}
+    ${btn("Đăng nhập ngay", loginUrl)}
+    <p style="margin-top:16px;font-size:12px;color:#94a3b8;">Nếu quý vị không yêu cầu đặt lại mật khẩu, vui lòng liên hệ ban quản trị hệ thống.</p>
+  `;
+  return wrap(subject, body);
+}
+
 // ── Clarification requested → supplier ────────────────────────────────────────
 
 export function clarificationRequestedEmail(
