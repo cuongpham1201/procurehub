@@ -144,14 +144,13 @@ export default function TenderListPage() {
         const visible = allAdmin.filter(
           (t) =>
             t.status === "Đang nhận báo giá" ||
-            t.status === "Đã đóng" ||
-            bidTenderIds.has(t.id)
+            (t.status === "Đã đóng" && bidTenderIds.has(t.id))
         );
         setTenders(visible.map(adminToPublicTender));
       } else {
         setUserType("guest");
         const visible = allAdmin.filter(
-          (t) => t.status === "Đang nhận báo giá" || t.status === "Đã đóng"
+          (t) => t.status === "Đang nhận báo giá"
         );
         setTenders(visible.map(adminToPublicTender));
       }

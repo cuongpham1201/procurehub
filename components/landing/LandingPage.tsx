@@ -267,7 +267,6 @@ function buildCategories(tenders: AdminTender[], categories: PurchaseCategory[])
 
 function buildLatestOpenTenders(tenders: AdminTender[]): Tender[] {
   return [...tenders]
-    .filter((t) => t.status && t.status !== "Nháp")
     .sort((a, b) => {
       const deadlineDiff = parseDateTime(a.deadline) - parseDateTime(b.deadline);
       if (deadlineDiff !== 0) return deadlineDiff;
@@ -983,8 +982,9 @@ export default function LandingPage() {
     async function loadData() {
       const [tenders, categories] = await Promise.all([getTenders(), getPurchaseCategories()]);
       const activeCategories = categories.filter((category) => category.status === "Hoạt động");
-      setCategoryStats(buildCategories(tenders, activeCategories));
-      setLatestTenders(buildLatestOpenTenders(tenders));
+      const openTenders = tenders.filter((t) => t.status === "Đang nhận báo giá");
+      setCategoryStats(buildCategories(openTenders, activeCategories));
+      setLatestTenders(buildLatestOpenTenders(openTenders));
     }
     loadData();
   }, []);
