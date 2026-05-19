@@ -928,18 +928,18 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                   <h3 className="font-semibold text-slate-700 text-sm mb-3">Xóa gói thầu</h3>
                   <button
                     onClick={handleDelete}
-                    disabled={tender.status !== "Nháp" || isDeleting}
+                    disabled={(tender.status !== "Nháp" && tender.status !== "Đã hủy") || isDeleting}
                     title={
-                      tender.status !== "Nháp"
-                        ? `Chỉ xóa được gói thầu ở trạng thái Nháp (hiện tại: ${tender.status})`
+                      tender.status !== "Nháp" && tender.status !== "Đã hủy"
+                        ? `Chỉ xóa được gói thầu ở trạng thái Nháp hoặc Đã hủy (hiện tại: ${tender.status})`
                         : "Xóa vĩnh viễn gói thầu này"
                     }
                     className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isDeleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
                   </button>
-                  {tender.status !== "Nháp" && (
-                    <p className="text-xs text-slate-400 mt-2">Chỉ xóa được khi trạng thái là Nháp.</p>
+                  {tender.status !== "Nháp" && tender.status !== "Đã hủy" && (
+                    <p className="text-xs text-slate-400 mt-2">Chỉ xóa được khi trạng thái là Nháp hoặc Đã hủy.</p>
                   )}
                 </div>
               )}

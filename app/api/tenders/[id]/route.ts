@@ -144,9 +144,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { id } = await params;
     const previous = await getTender(id);
 
-    // Chỉ xóa được gói thầu ở trạng thái Nháp
-    if (previous && previous.status !== "Nháp")
-      return fail(new Error(`Chỉ có thể xóa gói thầu ở trạng thái Nháp (hiện tại: ${previous.status})`), 400);
+    // Chỉ xóa được gói thầu ở trạng thái Nháp hoặc Đã hủy
+    if (previous && previous.status !== "Nháp" && previous.status !== "Đã hủy")
+      return fail(new Error(`Chỉ có thể xóa gói thầu ở trạng thái Nháp hoặc Đã hủy (hiện tại: ${previous.status})`), 400);
 
     await deleteTenderRecord(id);
     if (previous) {
