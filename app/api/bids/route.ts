@@ -97,9 +97,12 @@ export async function POST(request: Request) {
     if (tender.status !== "Đang nhận báo giá")
       return fail(new Error(`Gói thầu hiện không nhận báo giá (trạng thái: ${tender.status})`), 400);
 
-    // Kiểm tra deadline
+    // Kiểm tra deadline — date-only string (YYYY-MM-DD) được hiểu là hết ngày theo giờ VN (UTC+7)
     if (tender.deadline) {
-      const deadline = new Date(tender.deadline);
+      const trimmed = tender.deadline.trim();
+      const deadline = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+        ? new Date(`${trimmed}T23:59:59+07:00`)
+        : new Date(trimmed);
       if (!isNaN(deadline.getTime()) && deadline < new Date())
         return fail(new Error("Gói thầu đã hết hạn nộp báo giá"), 400);
     }
