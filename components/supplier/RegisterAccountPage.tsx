@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   saveAccount,
   isEmailExists,
@@ -36,8 +35,6 @@ interface FormData {
   contactName: string;
   email: string;
   phone: string;
-  password: string;
-  confirmPassword: string;
   agreed: boolean;
 }
 type FormErrors = Partial<Record<keyof FormData, string>>;
@@ -48,8 +45,6 @@ const EMPTY: FormData = {
   contactName: "",
   email: "",
   phone: "",
-  password: "",
-  confirmPassword: "",
   agreed: false,
 };
 
@@ -63,10 +58,6 @@ function validate(f: FormData): FormErrors {
   if (!f.email.trim()) e.email = "Vui lòng nhập địa chỉ email.";
   else if (!EMAIL_RE.test(f.email)) e.email = "Địa chỉ email không hợp lệ.";
   if (!f.phone.trim()) e.phone = "Vui lòng nhập số điện thoại.";
-  if (!f.password) e.password = "Vui lòng nhập mật khẩu.";
-  else if (f.password.length < 6) e.password = "Mật khẩu tối thiểu 6 ký tự.";
-  if (!f.confirmPassword) e.confirmPassword = "Vui lòng xác nhận mật khẩu.";
-  else if (f.confirmPassword !== f.password) e.confirmPassword = "Mật khẩu xác nhận không khớp.";
   if (!f.agreed) e.agreed = "Vui lòng đồng ý với điều khoản sử dụng.";
   return e;
 }
@@ -87,38 +78,38 @@ function inputCls(err?: string) {
 }
 
 // ── success state ──────────────────────────────────────────────────────────
-function SuccessState({ supplierId }: { supplierId: string }) {
+function SuccessState({ email }: { email: string }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-10 max-w-md w-full text-center">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5 text-green-600">
-          <IconCheck />
+        <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-5 text-blue-600">
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
         </div>
         <h2 className="text-xl font-bold text-slate-800 mb-2">
-          Tạo tài khoản thành công!
+          Kiểm tra hộp thư của bạn!
         </h2>
         <p className="text-sm text-slate-500 mb-4">
-          Tài khoản nhà cung cấp đã được tạo. Vui lòng đăng nhập để hoàn thiện hồ sơ.
+          Chúng tôi đã gửi email kích hoạt tài khoản kèm mật khẩu tạm thời đến:
         </p>
-        <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left space-y-1">
-          <p className="text-xs text-slate-400 uppercase tracking-wide font-medium">Mã tài khoản</p>
-          <p className="text-base font-mono font-semibold text-[#0f2d5e]">{supplierId}</p>
-          <p className="text-xs text-amber-600 mt-2 font-medium">Trạng thái: Chưa hoàn thiện hồ sơ</p>
+        <p className="text-base font-semibold text-[#0f2d5e] mb-4">{email}</p>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left text-sm text-amber-800 space-y-1">
+          <p className="font-semibold">Các bước tiếp theo:</p>
+          <ol className="list-decimal list-inside space-y-1 text-xs">
+            <li>Mở email và click nút <strong>Xác thực email</strong></li>
+            <li>Đăng nhập bằng mật khẩu tạm thời trong email</li>
+            <li>Đổi mật khẩu mới theo yêu cầu</li>
+            <li>Hoàn thiện hồ sơ nhà cung cấp</li>
+          </ol>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            href="/login?next=%2Fsupplier%2Fprofile"
-            className="flex-1 bg-[#c9a227] hover:bg-[#b8960c] text-white font-semibold py-2.5 px-4 rounded-lg text-sm text-center transition-colors"
-          >
-            Hoàn thiện hồ sơ
-          </Link>
-          <Link
-            href="/login"
-            className="flex-1 border border-[#0f2d5e] text-[#0f2d5e] hover:bg-[#0f2d5e]/5 font-semibold py-2.5 px-4 rounded-lg text-sm text-center transition-colors"
-          >
-            Đăng nhập
-          </Link>
-        </div>
+        <p className="text-xs text-slate-400">
+          Không nhận được email? Kiểm tra thư mục spam hoặc liên hệ{" "}
+          <a href="mailto:ncc@biahalong.vn" className="text-[#0f2d5e] font-medium hover:underline">
+            ncc@biahalong.vn
+          </a>
+        </p>
       </div>
     </div>
   );
@@ -126,13 +117,12 @@ function SuccessState({ supplierId }: { supplierId: string }) {
 
 // ── main component ─────────────────────────────────────────────────────────
 export default function RegisterAccountPage() {
-  const router = useRouter();
   const [form, setForm] = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<FormErrors>({});
   const [globalError, setGlobalError] = useState("");
-  const [savedId, setSavedId] = useState("");
+  const [savedEmail, setSavedEmail] = useState("");
 
-  if (savedId) return <SuccessState supplierId={savedId} />;
+  if (savedEmail) return <SuccessState email={savedEmail} />;
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -184,40 +174,21 @@ export default function RegisterAccountPage() {
       return;
     }
     const id = `SUP-${Date.now().toString().slice(-5)}`;
+    const normalizedEmail = form.email.trim().toLowerCase();
     const account: SupplierAccount = {
       id,
       companyName: form.companyName.trim(),
       taxCode: form.taxCode.trim(),
       contactName: form.contactName.trim(),
-      email: form.email.trim().toLowerCase(),
+      email: normalizedEmail,
       phone: form.phone.trim(),
-      password: form.password,
+      password: "",
       profileCompleted: false,
       status: "Chưa hoàn thiện hồ sơ",
       createdAt: new Date().toISOString(),
     };
     await saveAccount(account);
-
-    // Auto-login after registration so the supplier lands directly on profile
-    try {
-      const loginRes = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          kind: "supplier",
-        }),
-      });
-      if (loginRes.ok) {
-        router.push("/supplier/profile");
-        return;
-      }
-    } catch {
-      // fall through to success state
-    }
-
-    setSavedId(id);
+    setSavedEmail(normalizedEmail);
   }
 
   return (
@@ -297,7 +268,7 @@ export default function RegisterAccountPage() {
                 {/* Contact & credentials */}
                 <div>
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                    Thông tin đăng nhập
+                    Thông tin liên hệ
                   </p>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
@@ -313,6 +284,9 @@ export default function RegisterAccountPage() {
                         className={inputCls(errors.email)}
                       />
                       <FieldError msg={errors.email} />
+                      <p className="text-xs text-slate-400 mt-1">
+                        Email này dùng để nhận link kích hoạt và đăng nhập.
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -327,32 +301,6 @@ export default function RegisterAccountPage() {
                         className={inputCls(errors.phone)}
                       />
                       <FieldError msg={errors.phone} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Mật khẩu <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="password"
-                        value={form.password}
-                        onChange={(e) => set("password", e.target.value)}
-                        placeholder="Tối thiểu 6 ký tự"
-                        className={inputCls(errors.password)}
-                      />
-                      <FieldError msg={errors.password} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Xác nhận mật khẩu <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="password"
-                        value={form.confirmPassword}
-                        onChange={(e) => set("confirmPassword", e.target.value)}
-                        placeholder="Nhập lại mật khẩu"
-                        className={inputCls(errors.confirmPassword)}
-                      />
-                      <FieldError msg={errors.confirmPassword} />
                     </div>
                   </div>
                 </div>
@@ -405,9 +353,10 @@ export default function RegisterAccountPage() {
               <ol className="space-y-4">
                 {[
                   ["1", "Đăng ký tài khoản", "Nhanh, chỉ 2 phút"],
-                  ["2", "Hoàn thiện hồ sơ", "Thêm năng lực doanh nghiệp"],
-                  ["3", "Xét duyệt", "Bia Hạ Long xác nhận trong 1-3 ngày"],
-                  ["4", "Nhận RFQ", "Bắt đầu nhận yêu cầu báo giá"],
+                  ["2", "Xác thực email", "Click link trong email kích hoạt"],
+                  ["3", "Đổi mật khẩu", "Đặt mật khẩu cá nhân ngay sau đăng nhập"],
+                  ["4", "Hoàn thiện hồ sơ", "Thêm năng lực doanh nghiệp"],
+                  ["5", "Xét duyệt & nhận RFQ", "Bia Hạ Long xác nhận trong 1-3 ngày"],
                 ].map(([n, title, sub]) => (
                   <li key={n} className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#c9a227] text-[#0a1e3d] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">

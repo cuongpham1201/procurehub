@@ -14,6 +14,7 @@ import {
   bidSubmittedEmail,
   clarificationRequestedEmail,
   clarificationRespondedEmail,
+  supplierActivationEmail,
   supplierApprovedEmail,
   supplierDeactivatedEmail,
   supplierNeedMoreInfoEmail,
@@ -62,6 +63,17 @@ export async function sendEmailSafe(
 }
 
 // ── Typed helpers ─────────────────────────────────────────────────────────────
+
+/** Supplier: activation email with temp password and verification link */
+export async function emailSupplierActivation(
+  email: string,
+  supplierName: string,
+  tempPassword: string,
+  verifyUrl: string,
+): Promise<void> {
+  const { subject, html } = supplierActivationEmail(supplierName, tempPassword, verifyUrl);
+  await sendEmailSafe(email, subject, html);
+}
 
 /** Supplier: a clarification has been requested on their bid */
 export async function emailClarificationRequested(

@@ -355,9 +355,13 @@ export default function SupplierDashboardPage() {
 
   useEffect(() => {
     if (sessionLoading) return;
+    if (session?.mustChangePassword) {
+      router.replace("/supplier/change-password");
+      return;
+    }
     ensureTenderSeedData();
     loadData();
-  }, [session, sessionLoading, loadData]);
+  }, [session, sessionLoading, loadData, router]);
 
   useEffect(() => {
     if (sessionLoading || !session) return;

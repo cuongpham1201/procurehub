@@ -10,6 +10,7 @@ export interface CurrentUser {
   role: string;
   kind: "internal" | "supplier";
   permissions: Permission[];
+  mustChangePassword: boolean;
 }
 
 interface UseCurrentUserResult {

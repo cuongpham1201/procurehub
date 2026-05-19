@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { fail, forbidden, ok, unauthorized } from "@/lib/api";
 import {
   actorFromSession,
@@ -12,14 +13,23 @@ import { getServerSession } from "@/lib/auth/server";
 import { hasPermissionDB } from "@/lib/auth/rbac-server";
 import { notifyInternalByRolesSafe } from "@/lib/notifications/service";
 import { NotificationType } from "@/lib/notifications/types";
+import { emailSupplierActivation } from "@/lib/email/service";
 import {
   checkSupplierDuplicates,
   getSupplier,
   listSuppliers,
+  setSupplierActivation,
   upsertSupplier,
 } from "@/lib/repositories/procurehub";
 import type { SupplierAccount } from "@/types/supplierAccount";
 import type { ActivityAction } from "@/types/activityLog";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://dauthau.zlab.io.vn";
+
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
 
 const PROCUREMENT_ROLES = ["Admin", "Trưởng phòng vật tư", "Kế hoạch vật tư"];
 
@@ -72,10 +82,6 @@ export async function POST(request: Request) {
       return fail(new Error("Họ tên người liên hệ không được để trống"), 400);
 
     const isNew = !supplier.id;
-    if (isNew && !supplier.password?.trim())
-      return fail(new Error("Mật khẩu không được để trống"), 400);
-    if (isNew && supplier.password!.length < 6)
-      return fail(new Error("Mật khẩu tối thiểu 6 ký tự"), 400);
 
     // Kiểm tra trùng lặp email / taxCode / phone
     const { emailExists, taxCodeExists, phoneExists } = await checkSupplierDuplicates({
@@ -88,11 +94,15 @@ export async function POST(request: Request) {
     if (taxCodeExists) return fail(new Error("Mã số thuế đã tồn tại trong hệ thống"), 400);
     if (phoneExists)   return fail(new Error("Số điện thoại đã được sử dụng bởi tài khoản khác"), 400);
 
-    // Hash password khi tạo mới (chỉ hash nếu là plaintext)
+    // Hash password khi update profile (internal admin giữ lại logic cũ)
     let supplierToSave = supplier;
-    if (isNew && supplier.password && !supplier.password_hash) {
+    if (!isNew && supplier.password && !supplier.password_hash) {
       const password_hash = await hashPassword(supplier.password);
       supplierToSave = { ...supplier, password_hash, password: "" };
+    }
+    // Khi tạo mới: không nhận password từ client, sẽ set sau
+    if (isNew) {
+      supplierToSave = { ...supplier, password: "", password_hash: undefined };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -121,6 +131,15 @@ export async function POST(request: Request) {
       newValues: snapshot(saved),
     });
     if (action === "created") {
+      // Generate temp password + verification token, store in DB, send activation email
+      const tempPassword = generateTempPassword();
+      const verificationToken = randomUUID();
+      const passwordHash = await hashPassword(tempPassword);
+      await setSupplierActivation(saved.id, passwordHash, verificationToken);
+
+      const verifyUrl = `${APP_URL}/supplier/verify-email?token=${verificationToken}`;
+      void emailSupplierActivation(saved.email, saved.companyName, tempPassword, verifyUrl);
+
       await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
         type: NotificationType.SUPPLIER_REGISTERED,
         title: "Nhà cung cấp mới đăng ký",

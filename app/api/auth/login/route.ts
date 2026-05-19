@@ -106,8 +106,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (kind === "supplier") {
-    const result = await query<UserRow>(
-      "SELECT id, company_name, email, status, password, password_hash FROM suppliers WHERE lower(email) = $1 LIMIT 1",
+    const result = await query<UserRow & { email_verified: boolean; must_change_password: boolean }>(
+      "SELECT id, company_name, email, status, password, password_hash, email_verified, must_change_password FROM suppliers WHERE lower(email) = $1 LIMIT 1",
       [normalizedEmail],
     );
 
@@ -118,6 +118,13 @@ export async function POST(req: NextRequest) {
 
     if (supplier.status === "Tạm khóa" || supplier.status === "Từ chối") {
       return NextResponse.json({ error: "Tài khoản nhà cung cấp không được phép truy cập" }, { status: 403 });
+    }
+
+    if (!supplier.email_verified) {
+      return NextResponse.json(
+        { error: "Email chưa được xác thực. Vui lòng kiểm tra hộp thư và click link kích hoạt tài khoản." },
+        { status: 403 },
+      );
     }
 
     const valid = await checkAndUpgradePassword(
@@ -146,6 +153,7 @@ export async function POST(req: NextRequest) {
       email: supplier.email,
       role: "supplier",
       kind: "supplier",
+      mustChangePassword: supplier.must_change_password ?? false,
     });
   }
 

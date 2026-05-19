@@ -63,6 +63,26 @@ function noteBox(text: string, color = "#fef3c7", borderColor = "#f59e0b"): stri
   return `<div style="background:${color};border-left:4px solid ${borderColor};border-radius:4px;padding:12px 16px;margin:16px 0;font-size:13px;white-space:pre-wrap;">${text}</div>`;
 }
 
+// ── Supplier account activation ───────────────────────────────────────────────
+
+export function supplierActivationEmail(
+  supplierName: string,
+  tempPassword: string,
+  verifyUrl: string,
+): ReturnType<typeof wrap> {
+  const subject = `[Kích hoạt tài khoản] Nhà cung cấp ${APP_NAME}`;
+  const body = `
+    <p>Kính gửi ${highlight(supplierName)},</p>
+    <p>Cảm ơn quý công ty đã đăng ký tài khoản nhà cung cấp trên hệ thống <strong>${APP_NAME}</strong>.</p>
+    <p>Để kích hoạt tài khoản, vui lòng click vào nút bên dưới:</p>
+    ${btn("Xác thực email & kích hoạt tài khoản", verifyUrl)}
+    <p style="margin-top:24px;">Sau khi xác thực, hệ thống sẽ yêu cầu quý công ty đặt mật khẩu mới. Mật khẩu tạm thời để đăng nhập lần đầu là:</p>
+    ${noteBox(`Mật khẩu tạm thời: ${tempPassword}\n\nLưu ý: Quý vị sẽ được yêu cầu đổi mật khẩu ngay sau khi đăng nhập.`, "#f0fdf4", "#16a34a")}
+    <p style="margin-top:16px;font-size:12px;color:#94a3b8;">Link xác thực có hiệu lực trong 24 giờ. Nếu quý vị không thực hiện đăng ký này, vui lòng bỏ qua email.</p>
+  `;
+  return wrap(subject, body);
+}
+
 // ── Clarification requested → supplier ────────────────────────────────────────
 
 export function clarificationRequestedEmail(

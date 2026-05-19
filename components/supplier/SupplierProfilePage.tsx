@@ -94,6 +94,10 @@ export default function SupplierProfilePage() {
       router.replace("/login");
       return;
     }
+    if (session.mustChangePassword) {
+      router.replace("/supplier/change-password");
+      return;
+    }
     // Load supplier data + categories + uploads in parallel
     Promise.all([
       fetch(`/api/suppliers/${session.id}`).then((r) => r.ok ? r.json() : null),

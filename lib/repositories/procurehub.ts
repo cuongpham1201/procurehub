@@ -368,6 +368,56 @@ export async function upsertSupplier(account: SupplierAccount): Promise<Supplier
   return account;
 }
 
+/** Called during registration: store verification token + random password hash, mark unverified */
+export async function setSupplierActivation(
+  id: string,
+  passwordHash: string,
+  verificationToken: string,
+): Promise<void> {
+  await query(
+    `UPDATE suppliers
+     SET password_hash = $1, password = '', verification_token = $2,
+         email_verified = FALSE, must_change_password = TRUE, updated_at = NOW()
+     WHERE id = $3`,
+    [passwordHash, verificationToken, id],
+  );
+}
+
+/** Called from verify-email route: mark supplier as verified and clear token */
+export async function verifySupplierEmail(token: string): Promise<string | null> {
+  const res = await query<{ id: string }>(
+    `UPDATE suppliers
+     SET email_verified = TRUE, verification_token = NULL, updated_at = NOW()
+     WHERE verification_token = $1
+     RETURNING id`,
+    [token],
+  );
+  return res.rows[0]?.id ?? null;
+}
+
+/** Called after supplier successfully sets a new password */
+export async function markPasswordChanged(id: string, newPasswordHash: string): Promise<void> {
+  await query(
+    `UPDATE suppliers
+     SET password_hash = $1, password = '', must_change_password = FALSE, updated_at = NOW()
+     WHERE id = $2`,
+    [newPasswordHash, id],
+  );
+}
+
+/** Returns email_verified + must_change_password for a supplier by id */
+export async function getSupplierAuthFlags(
+  id: string,
+): Promise<{ emailVerified: boolean; mustChangePassword: boolean } | null> {
+  const res = await query<{ email_verified: boolean; must_change_password: boolean }>(
+    `SELECT email_verified, must_change_password FROM suppliers WHERE id = $1`,
+    [id],
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return { emailVerified: row.email_verified, mustChangePassword: row.must_change_password };
+}
+
 export async function listTenders(): Promise<AdminTender[]> {
   // Auto-close tenders whose deadline has passed (server-side, idempotent)
   await query(

@@ -10,6 +10,8 @@ export interface SupplierAccount {
   profileCompleted: boolean;
   status: string;
   createdAt: string;
+  emailVerified?: boolean;
+  mustChangePassword?: boolean;
   // Profile fields — populated when supplier completes profile
   address?: string;
   province?: string;
