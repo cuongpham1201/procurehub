@@ -336,6 +336,18 @@ export default function SupplierDashboardPage() {
   const [openTenders, setOpenTenders] = useState(0);
   const [unbidOpenTenders, setUnbidOpenTenders] = useState(0);
   const [loading, setLoading] = useState(true);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const loadData = useCallback(async () => {
     const allOpen = (await getTenders()).filter((t) => t.status === "Đang nhận báo giá" || t.status === "Đã đóng");
@@ -395,19 +407,6 @@ export default function SupplierDashboardPage() {
     refetchSession();
     router.push("/");
   }
-
-  const userMenuRef = useRef<HTMLDivElement>(null);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const isApproved = normalizeStatus(account) === "Đã duyệt";
 
