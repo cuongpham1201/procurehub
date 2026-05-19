@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getAdminTenderById, reopenTender, saveAdminTender, updateAdminTenderStatus, ensureTenderSeedData } from "@/services/tenderStorage";
+import { deleteTender, getAdminTenderById, reopenTender, saveAdminTender, updateAdminTenderStatus, ensureTenderSeedData } from "@/services/tenderStorage";
 import { getBids } from "@/services/supplierBidStorage";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -163,6 +163,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
   const [materialItems, setMaterialItems] = useState<MaterialItem[]>([]);
   const [quickMaterialRow, setQuickMaterialRow] = useState<number | null>(null);
   const [quickMaterialError, setQuickMaterialError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     ensureTenderSeedData();
@@ -193,6 +194,19 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
     setSuccessMsg("Đã cập nhật trạng thái gói thầu.");
     setTimeout(() => setSuccessMsg(""), 4000);
     void oldStatus;
+  }
+
+  async function handleDelete() {
+    if (!tender) return;
+    if (!window.confirm(`Xóa vĩnh viễn gói thầu "${tender.title}"? Hành động này không thể hoàn tác.`)) return;
+    setIsDeleting(true);
+    try {
+      await deleteTender(tender.id);
+      router.push("/admin/tenders");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Xóa thất bại. Vui lòng thử lại.");
+      setIsDeleting(false);
+    }
   }
 
   function openReopenForm() {
@@ -467,8 +481,10 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
   }
 
   const actions = getActions(tender.status);
-  const canEdit = permissions.includes("tenders:write");
-  const canStatus = permissions.includes("tenders:publish");
+  const isFinalized = tender.status === "Đã có kết quả";
+  const canEdit = permissions.includes("tenders:write") && !isFinalized;
+  const canStatus = permissions.includes("tenders:publish") && !isFinalized;
+  const canDelete = permissions.includes("tenders:delete");
   const isAdmin = permissions.includes("admin:full");
   const canReopenTender = isAdmin && tender.status === "Đã đóng";
   const categoryOptions =
@@ -875,7 +891,7 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                 <button
                   onClick={startEdit}
                   disabled={!canEdit}
-                  title={!canEdit ? "Bạn không có quyền chỉnh sửa gói thầu" : undefined}
+                  title={isFinalized ? "Gói thầu đã chốt kết quả, không thể chỉnh sửa" : !canEdit ? "Bạn không có quyền chỉnh sửa gói thầu" : undefined}
                   className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-[#0f2d5e] text-[#0f2d5e] hover:bg-[#0f2d5e] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#0f2d5e]"
                 >
                   Chỉnh sửa thông tin
@@ -905,6 +921,26 @@ export default function AdminTenderDetailPage({ id }: { id: string }) {
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+              {canDelete && (
+                <div className="bg-white rounded-xl border border-red-100 p-5">
+                  <h3 className="font-semibold text-slate-700 text-sm mb-3">Xóa gói thầu</h3>
+                  <button
+                    onClick={handleDelete}
+                    disabled={tender.status !== "Nháp" || isDeleting}
+                    title={
+                      tender.status !== "Nháp"
+                        ? `Chỉ xóa được gói thầu ở trạng thái Nháp (hiện tại: ${tender.status})`
+                        : "Xóa vĩnh viễn gói thầu này"
+                    }
+                    className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isDeleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
+                  </button>
+                  {tender.status !== "Nháp" && (
+                    <p className="text-xs text-slate-400 mt-2">Chỉ xóa được khi trạng thái là Nháp.</p>
+                  )}
                 </div>
               )}
               {(tender.status === "Đang đánh giá" || tender.status === "Chờ phê duyệt" || tender.status === "Đã có kết quả") && bids.length > 0 && (

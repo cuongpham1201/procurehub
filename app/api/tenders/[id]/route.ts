@@ -66,6 +66,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const tender = (await request.json()) as AdminTender;
     const previous = await getTender(id);
 
+    // Gói thầu đã chốt kết quả → không cho phép chỉnh sửa hay đổi trạng thái
+    if (previous?.status === "Đã có kết quả")
+      return fail(new Error("Không thể chỉnh sửa gói thầu đã chốt kết quả"), 400);
+
     // Phân biệt: đổi trạng thái → tenders:publish, sửa nội dung → tenders:write
     const isStatusChange = previous && tender.status !== previous.status;
     if (isStatusChange) {
@@ -139,6 +143,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return forbidden(`Vai trò "${session.role}" không có quyền xóa gói thầu`);
     const { id } = await params;
     const previous = await getTender(id);
+
+    // Chỉ xóa được gói thầu ở trạng thái Nháp
+    if (previous && previous.status !== "Nháp")
+      return fail(new Error(`Chỉ có thể xóa gói thầu ở trạng thái Nháp (hiện tại: ${previous.status})`), 400);
+
     await deleteTenderRecord(id);
     if (previous) {
       await logActivitySafe({
