@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       const passwordHash = await hashPassword(tempPassword);
       await setSupplierActivation(saved.id, passwordHash, verificationToken);
 
-      const verifyUrl = `${APP_URL}/supplier/verify-email?token=${verificationToken}`;
+      const verifyUrl = `${APP_URL}/api/auth/verify-email?token=${verificationToken}`;
       void emailSupplierActivation(saved.email, saved.companyName, tempPassword, verifyUrl);
 
       await notifyInternalByRolesSafe(PROCUREMENT_ROLES, {
